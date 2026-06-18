@@ -37,7 +37,8 @@ jobs:
 
       - name: No credentials committed
         run: |
-          if git grep -nE 'eyJhbGci|"refreshToken"[[:space:]]*:[[:space:]]*"[0-9a-f]{32}' -- ; then
+          # exclude this workflow file itself (it contains the patterns as literals)
+          if git grep -nE 'eyJhbGci|"refreshToken"[[:space:]]*:[[:space:]]*"[0-9a-f]{32}' -- . ':!.github/workflows/*'; then
             echo "::error::possible credential committed"; exit 1
           else
             echo "no secrets found"
