@@ -1,0 +1,12 @@
+{
+  "name": "qullamaggie-swing-trading",
+  "version": "1.0.0",
+  "description": "Qullamaggie (Kristjan Kullamägi) swing-trading method assistant for TradingView — Breakout + EP setups: definition, screening, entry (ORH), stops, staged exits, risk/position sizing, and market-environment gating. Chinese-language skill.",
+  "author": {
+    "name": "Chao Cao",
+    "url": "https://github.com/HenryVarro666"
+  },
+  "homepage": "https://github.com/HenryVarro666/qullamaggie-screener",
+  "license": "MIT",
+  "keywords": ["trading", "swing-trading", "qullamaggie", "tradingview", "stock-screener", "breakout", "episodic-pivot"]
+}

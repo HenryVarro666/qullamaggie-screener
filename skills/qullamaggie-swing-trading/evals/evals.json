@@ -1,0 +1,54 @@
+{
+  "skill_name": "qullamaggie-swing-trading",
+  "evals": [
+    {
+      "id": "ep-classify",
+      "prompt": "我在 Deepvue 上扫到 RBRK 今天财报后跳空了 12%，盘前成交量已经放得很大，过去半年基本横着没怎么涨。这算不算一个 EP？如果算，我应该在哪进场、止损放哪、之后怎么减仓？",
+      "expected_output": "确认这是有效 EP（跳空≥10%、放量、前 3-6 月未大涨都满足）；进场=开盘区间高点 ORH；止损=当日低点且不宽于 ADR；分批止盈（3-5 天卖 1/3-1/2 并移止损保本，余仓 EMA10/20 trailing）；附非投资建议提醒。",
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": "position-size",
+      "prompt": "账户 5 万美金，我想买 PLTR，计划 25 块进场、止损放 23.8。我单笔最多亏账户的 0.5%。该买多少股？这笔盈亏比要到多少才值得做？另外怎么在 tradingview 上快速看到仓位和盈亏比？",
+      "expected_output": "股数≈208（(50000×0.005)/(25−23.8)=208.3）；解释 R 概念；建议盈亏比≥3R；推荐用 TradingView Long Position 工具并先设 Account Size/Account Risk 自动反推仓位。",
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": "market-gate",
+      "prompt": "现在 QQQ 周线在 50 周线下面来回磨，上周还跳水了一根大阴线。我手上有个看着不错的 breakout setup，能开仓吗？",
+      "expected_output": "建议不开仓/等待，理由是市场环境不是牛市（熊市/回调期不交易，恐慌会拉低胜率）；引用看 QQQ 周线趋势或市场环境指标的规则。",
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": "breakout-coach",
+      "prompt": "我刚开始学 swing trading，能不能从头讲一遍 Qullamaggie 的 breakout 怎么做？怎么筛票、什么形态、在哪买、止损止盈怎么定？",
+      "expected_output": "覆盖三步形态（大涨→有序回调收窄贴均线→放量突破）；用 1/3/6 月涨幅前 1-2% 筛选；ORH 进场；当日低点止损且≤ADR；3-5 天分批止盈 + EMA10/20 trailing；并提三道闸门（牛市/热门主题/ADR≥3%、Stage2）。",
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": "replay-routine",
+      "prompt": "我打算用 Deepvue 的 bar replay 复盘练 setup，复盘的时候该按什么步骤走一遍一笔交易？进场、止损、止盈分别怎么标？",
+      "expected_output": "给出逐笔纪律：把图拉到 setup 形成前逐根推进，在 ORH/突破点标进场，当日低点标止损（≤ADR），分批止盈（3-5 天减仓+移保本+EMA trailing），记录这笔几个 R；强调专注 setup 选择。",
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": "breakout-screener-setup",
+      "prompt": "我想在 Deepvue 上建一个扫 Breakout 候选的选股器，具体该加哪些 filter、阈值设多少？没有 Deepvue 的话用 TradingView 内置 screener 怎么尽量做到一样？",
+      "expected_output": "给出 Deepvue 硬过滤：Region=US、ADR≥3%、Price≥1 USD、Perf 6M≥20%、Price×avg vol 30D≥500K USD，并按 Perf 排序近似'涨幅前 1-2%'；说明 TradingView 映射（6M Performance、Average Volume 等）且指出 TV 无原生 ADR%，需用图上 ADR 指标或 ATR/价格近似；提醒扫出后仍要人工过 Stage 2 + 形态。引用 references/screening.md。",
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": "ep-screener-setup",
+      "prompt": "盘前怎么用选股器扫今天的 EP 候选？Deepvue 里该设什么、靠哪些列判断是不是真 EP？",
+      "expected_output": "Deepvue 硬过滤：Region=US、Price≥1、Pre-mkt gap≥10%；靠 Recent/Upcoming earnings date 锁定财报型、EPS dil growth/Revenue growth 确认强劲增长、Perf% 确认过去 3-6 月没大涨；强调盘前没放量则要求开盘 15-30 分钟内放到日均量；引用 references/screening.md。",
+      "files": [],
+      "assertions": []
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "_meta": {
+    "about": "Theme on/off config. enabled:true = include in scan; all false = scan the whole market. tickers are SEEDS (curated examples) — edit freely. 主题开关配置：enabled 控制是否纳入；tickers 是示例种子，自行增删。",
+    "rank_by": "perf6M",
+    "breakout_floors": {"price": 1, "adr": 0.03, "perf6M": 0.20, "dollarVol20d": 500000, "perf3M_min": 0.05, "perf1M_min": -0.20},
+    "ep_rules": {"gap_pct": 0.10, "rel_vol": 1.5, "perf6M_cap": 1.0},
+    "output_dir": "~/qmag-scans"
+  },
+  "themes": {
+    "Commercial Space 商业航天": {
+      "enabled": true, "note": "Deepvue Space preset",
+      "tickers": ["ASTS", "RKLB", "LUNR", "RDW", "SATS", "BKSY", "SPIR", "MNTS", "SIDU", "TSAT", "SPCE", "VSAT"]
+    },
+    "Energy Storage 储能": {
+      "enabled": true, "note": "grid storage + batteries (broad seed)",
+      "tickers": ["FLNC", "EOSE", "STEM", "NEOV", "ENVX", "AMPX", "QS", "FCEL", "PLUG", "MVST", "SLDP", "NPWR"]
+    },
+    "AI Genomics AI基因检测": {
+      "enabled": true, "note": "AI-driven genomics/diagnostics",
+      "tickers": ["TEM", "RXRX", "SDGR", "ABSI", "NTRA", "GH", "CRSP", "NTLA", "BEAM", "DNA"]
+    },
+    "Crypto Platforms 加密平台": {
+      "enabled": true, "note": "exchanges/platforms/holders (not miners)",
+      "tickers": ["COIN", "HOOD", "CRCL", "XYZ", "GLXY", "BULL", "MSTR"]
+    },
+    "Taiwan OSAT 台封测": {
+      "enabled": true, "note": "few US-listed; mainly ASX (ASE ADR) — coverage limited",
+      "tickers": ["ASX"]
+    },
+    "US OSAT 美封测": {
+      "enabled": true, "note": "Amkor + packaging/test equipment",
+      "tickers": ["AMKR", "KLIC", "COHU", "ONTO", "FORM", "CAMT", "ACLS"]
+    },
+    "Quantum 量子计算": {
+      "enabled": true, "note": "Deepvue Quantum preset (pure plays)",
+      "tickers": ["IONQ", "RGTI", "QBTS", "QUBT", "ARQQ", "QMCO"]
+    },
+    "Tungsten 钨矿": {
+      "enabled": true, "note": "nearly only Almonty (ALM) is a US-listed pure play",
+      "tickers": ["ALM"]
+    },
+    "ASIC / Custom Silicon ASIC芯片": {
+      "enabled": true, "note": "custom AI silicon / interconnect",
+      "tickers": ["AVGO", "MRVL", "CRDO", "ALAB", "ARM", "MXL", "RMBS", "SITM", "MTSI", "AXTI"]
+    }
+  }
+}

@@ -1,0 +1,87 @@
+//@version=6
+indicator("Market Environment (External Market Source)", overlay=true)
+// === Inputs ===
+// --- Market Source ---
+marketSymbol    = input.symbol("NASDAQ:NDX", "Market Symbol")
+marketTimeframe = input.timeframe("1D", "Market Timeframe")
+// --- MA Settings ---
+fastLen   = input.int(10,  "Fast MA Length", minval=1)
+midLen    = input.int(21,  "Mid MA Length",  minval=1)
+slowLen   = input.int(50,  "Slow MA Length", minval=1)
+fastType  = input.string("EMA", "Fast MA Type", options=["EMA", "SMA"])
+midType   = input.string("EMA", "Mid MA Type",  options=["EMA", "SMA"])
+slowType  = input.string("SMA", "Slow MA Type", options=["EMA", "SMA"])
+// --- Bull Confirmation ---
+bullBars  = input.int(2, "Bull Confirmation Bars", minval=1)
+// --- Display ---
+showMA = input.bool(true, "Show Market MAs On Chart")
+// --- Colors ---
+bullColor = input.color(color.green,  "Bull Color")
+bearColor = input.color(color.red,    "Bear Color")
+pullColor = input.color(color.yellow, "Pullback Color")
+bullAlpha = input.int(85, "Bull Transparency", minval=0, maxval=100)
+bearAlpha = input.int(85, "Bear Transparency", minval=0, maxval=100)
+pullAlpha = input.int(85, "Pullback Transparency", minval=0, maxval=100)
+// === MA Function ===
+ma(src, len, maType) =>
+    maType == "EMA" ? ta.ema(src, len) : ta.sma(src, len)
+// === Market Data ===
+marketClose = request.security(marketSymbol, marketTimeframe, close)
+// === Market MAs ===
+fastMA = request.security(marketSymbol, marketTimeframe, ma(close, fastLen, fastType))
+midMA  = request.security(marketSymbol, marketTimeframe, ma(close, midLen, midType))
+slowMA = request.security(marketSymbol, marketTimeframe, ma(close, slowLen, slowType))
+// === Core Conditions ===
+// Single-bar bull condition
+bullCondRaw = fastMA > midMA and midMA > slowMA
+// Consecutive bull confirmation
+var int bullCount = 0
+bullCount := bullCondRaw ? nz(bullCount[1]) + 1 : 0
+bullCond  = bullCount >= bullBars
+// Bear trigger:
+// when fastMA is below midMA, and slowMA crosses above either EMA
+bearCrossFast = ta.crossover(slowMA, fastMA)
+bearCrossMid  = ta.crossover(slowMA, midMA)
+bearTrigger   = fastMA < midMA and (bearCrossFast or bearCrossMid)
+// Bear hold
+bearHold = fastMA < midMA and (slowMA > fastMA or slowMA > midMA)
+// Pullback trigger
+pullTrigger = ta.crossunder(fastMA, midMA)
+// === State ===
+//  1 = Bull
+//  0 = Pullback
+// -1 = Bear
+var int state = na
+if barstate.isfirst
+    state := bullCond ? 1 : 0
+else
+    if bullCond
+        state := 1
+    else if bearTrigger
+        state := -1
+    else if state[1] == -1 and bearHold
+        state := -1
+    else if pullTrigger
+        state := 0
+    else if state[1] == 0 and not bullCond and not bearTrigger
+        state := 0
+    else
+        state := nz(state[1], 0)
+// === Background ===
+bgColor =
+     state == 1  ? color.new(bullColor, bullAlpha) :
+     state == 0  ? color.new(pullColor, pullAlpha) :
+     state == -1 ? color.new(bearColor, bearAlpha) :
+     na
+bgcolor(bgColor)
+// === Plot MAs ===
+plot(showMA ? fastMA : na, title="Market Fast MA", color=color.green, linewidth=2)
+plot(showMA ? midMA  : na, title="Market Mid MA",  color=color.orange, linewidth=2)
+plot(showMA ? slowMA : na, title="Market Slow MA", color=color.blue, linewidth=2)
+// === Alerts ===
+bullSignal = state == 1 and state[1] != 1
+bearSignal = state == -1 and state[1] != -1
+pullSignal = state == 0 and state[1] != 0
+alertcondition(bullSignal, title="Bull", message="Market = Bull")
+alertcondition(bearSignal, title="Bear", message="Market = Bear")
+alertcondition(pullSignal, title="Pullback", message="Market = Pullback")

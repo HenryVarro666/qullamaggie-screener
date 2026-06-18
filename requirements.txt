@@ -1,0 +1,5 @@
+# Deepvue scanner dependencies (scanner/ only — the skill itself needs nothing).
+requests>=2.31
+playwright>=1.40
+# After install, download the browser once:
+#   playwright install chromium

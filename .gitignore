@@ -1,0 +1,22 @@
+# ── Credentials & local state — NEVER commit ──
+cookies.json
+tokens.json
+symbols2_map.json
+.deepvue/
+*.local.json
+
+# ── Scan outputs ──
+扫描结果/
+qmag-scans/
+*-scans/
+scans/
+
+# ── Python ──
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ── OS ──
+.DS_Store
+Thumbs.db
