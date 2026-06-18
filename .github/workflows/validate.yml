@@ -1,0 +1,44 @@
+name: validate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Python syntax (scanner)
+        run: python -m py_compile scanner/theme_scan.py scanner/breakout_top10.py
+
+      - name: JSON config validity
+        run: |
+          python - <<'PY'
+          import json
+          for f in [
+              "scanner/themes.example.json",
+              ".claude-plugin/plugin.json",
+              "skills/qullamaggie-swing-trading/evals/evals.json",
+          ]:
+              json.load(open(f, encoding="utf-8"))
+              print("ok:", f)
+          PY
+
+      - name: Skill has YAML frontmatter
+        run: |
+          head -1 skills/qullamaggie-swing-trading/SKILL.md | grep -q '^---$' \
+            && echo "skill frontmatter ok"
+
+      - name: No credentials committed
+        run: |
+          if git grep -nE 'eyJhbGci|"refreshToken"[[:space:]]*:[[:space:]]*"[0-9a-f]{32}' -- ; then
+            echo "::error::possible credential committed"; exit 1
+          else
+            echo "no secrets found"
+          fi

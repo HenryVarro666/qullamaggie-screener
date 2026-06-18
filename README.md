@@ -12,6 +12,16 @@ coaches the method on TradingView, plus an optional auto-scanner that builds a d
 
 ---
 
+## 📊 Example daily report / 每日报告示例
+
+The scanner writes a heatmap-style markdown report grouped by theme, with per-stock
+**Breakout ✓ / EP ⚡** flags and analysis. (The TradingView fallback produces the same screen,
+done by hand.) 扫描器输出按主题分组的每日报告，每只带 Breakout/EP 标记与分析：
+
+![Example daily report](docs/example-report.png)
+
+---
+
 ## What's inside / 仓库内容
 
 | Path | What it is |
