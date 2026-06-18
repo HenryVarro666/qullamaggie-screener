@@ -51,31 +51,31 @@ cp -R qullamaggie-screener/skills/qullamaggie-swing-trading ~/.claude/skills/
 Or use it as a plugin (the repo ships a `.claude-plugin/plugin.json`). Manual copy above is the
 reliable path.
 
-### B. No Deepvue? Use the TradingView fallback (everyone) / 没有 Deepvue 走 TradingView
-Follow **[`tradingview-screener.md`](skills/qullamaggie-swing-trading/references/tradingview-screener.md)**:
-build the Breakout/EP screen in TradingView's built-in Stock Screener, confirm the base on the
-chart, and (optionally) load `assets/breakout-ep-flags.pine` to get per-symbol alerts.
-没有 Deepvue 的人**从这条开始**。
-
-### C. Deepvue auto-scanner (own account) / Deepvue 自动扫描（需自备账号）
-Automates the whole screen and writes a daily heatmap-style markdown report grouped by theme,
-with **Breakout ✓ / EP ⚡** flags and per-stock analysis. See **[`scanner/README.md`](scanner/README.md)**
-and **[`scanner/AUTH_SETUP.md`](scanner/AUTH_SETUP.md)**.
+### B. Auto-scanner — TradingView backend, **no login** (everyone) / 自动扫描（TradingView，免登录）
+The scanner now runs on **TradingView's public scan endpoint by default — no account, no token** —
+and writes a daily heatmap-style report grouped by theme with **Breakout ✓ / EP ⚡** flags + analysis.
+扫描器默认走 **TradingView 公开接口，无需登录/账号**，每天出按主题分组的报告。
 ```bash
-pip install -r requirements.txt && playwright install chromium
-# set up ~/.deepvue/ per AUTH_SETUP.md, then:
+pip install -r requirements.txt
+cp scanner/themes.example.json ~/.deepvue/themes.json   # backend already "tradingview"
 python3 scanner/theme_scan.py
 ```
-⚠️ Deepvue has no public API; this drives **your own** logged-in session and is subject to
-**Deepvue's Terms of Service**. Personal use only, human cadence, don't redistribute its data.
-Deepvue 扫描器逆向其付费私有接口，**仅供你自己付费账号自用**、遵守其服务条款、勿高频滥用。
+See **[`scanner/README.md`](scanner/README.md)**. (Prefer a manual workflow? The TradingView Stock
+Screener guide is in [`tradingview-screener.md`](skills/qullamaggie-swing-trading/references/tradingview-screener.md),
+plus `assets/breakout-ep-flags.pine` for per-symbol chart alerts.)
+
+### C. Deepvue backend (optional, own paid account) / Deepvue 后端（可选，自备账号）
+For real-time data + exact ADR, set `"backend": "deepvue"` in `themes.json` and supply your session
+per **[`scanner/AUTH_SETUP.md`](scanner/AUTH_SETUP.md)** (`pip install playwright && playwright install chromium`).
+⚠️ Drives **your own** logged-in session; subject to **Deepvue's Terms of Service**. Personal use only.
 
 ---
 
 ## The method in one screen / 一屏看懂口径
 
 - **Breakout ✓**: big prior move → orderly tightening pullback hugging rising MAs → volume
-  breakout. Screen ≈ `price≥1 · ADR%≥3 · 6M perf≥20% · 20d $vol≥500K · still trending`.
+  breakout. Screen ≈ `price≥1 · ADR%≥3 · 6M perf≥20% · 20d $vol≥$5M · within 25% of 52w high ·
+  Stage 2 (above 50- & 200-day MA, 50>200)`.
 - **EP ⚡** (Episodic Pivot): surprise catalyst gap on a quiet stock. Screen ≈ `gap≥10% ·
   rel-vol≥1.5 · prior 6M not already run`. Earnings is the main case, not the only one.
 - **Entry** = open-range high (ORH). **Stop** = day's low, width ≤ ADR. **Exit** = sell ⅓–½ in

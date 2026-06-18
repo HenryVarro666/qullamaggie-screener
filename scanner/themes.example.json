@@ -1,9 +1,11 @@
 {
   "_meta": {
-    "about": "Theme on/off config. enabled:true = include in scan; all false = scan the whole market. tickers are SEEDS (curated examples) — edit freely. 主题开关配置：enabled 控制是否纳入；tickers 是示例种子，自行增删。",
+    "about": "Theme on/off config. enabled:true = include in scan. tickers are SEEDS (curated examples) — edit freely. 主题开关配置：enabled 控制是否纳入；tickers 是示例种子，自行增删。",
+    "backend": "tradingview",
+    "_backend_help": "tradingview = no login, free, public scan endpoint (default). deepvue = your own paid account (exact ADR, real-time); see AUTH_SETUP.md.",
     "rank_by": "perf6M",
-    "breakout_floors": {"price": 1, "adr": 0.03, "perf6M": 0.20, "dollarVol20d": 500000, "perf3M_min": 0.05, "perf1M_min": -0.20, "max_off_high": 0.25},
-    "ep_rules": {"gap_pct": 0.10, "rel_vol": 1.5, "perf6M_cap": 1.0},
+    "breakout_floors": {"price": 1, "adr": 0.03, "perf6M": 0.20, "dollarVol20d": 5000000, "perf3M_min": 0.05, "perf1M_min": -0.20, "max_off_high": 0.25, "require_stage2": true, "require_ma_stack": true},
+    "ep_rules": {"gap_pct": 0.10, "rel_vol": 1.5, "perf6M_cap": 1.0, "min_dollar_vol": 5000000},
     "output_dir": "~/qmag-scans"
   },
   "themes": {

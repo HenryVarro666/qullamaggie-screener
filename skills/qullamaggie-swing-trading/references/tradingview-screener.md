@@ -1,5 +1,9 @@
 # 没有 Deepvue？用 TradingView 替补选股（Breakout + EP）
 
+> 💡 **已可自动化**：仓库的 `scanner/theme_scan.py` 现在内置 **TradingView 后端（`backend: tradingview`，免登录）**，
+> 直接用 TradingView 公开 scan 接口自动出报告——`Volatility.M` ≈ Deepvue ADR%（实测近乎一致）。本文件是**手动版/原理版**：
+> 想手点 screener、看图确认、或理解口径时读。
+
 这份是 `screening.md` 的**纯 TradingView 版**：不用 Deepvue，用 TradingView 内置 **Stock Screener** 做"全市场粗筛"，再回到图上人工确认形态。诚实前提：**TradingView 内置 screener 不如 Deepvue 精确**——没有原生 ADR%、盘前 gap 字段受订阅档位限制、也不能像 Deepvue 那样一键按多周期涨幅排序。所以 TV 路线是 **"screener 粗筛 + 图上指标精确确认"两步走**。
 
 > 进场/止损/止盈/仓位/市场环境判断完全沿用 `setups.md`、`risk-and-exits.md`、`tradingview-setup.md`、`SKILL.md`，本文件只补"怎么在 TV 里把候选扫出来"。
