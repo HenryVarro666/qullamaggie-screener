@@ -72,9 +72,11 @@ def deepvue_fetch(wanted):
         resp=requests.post(f"{API}/api/v2/auth/refresh",json={"refreshToken":tok["refreshToken"]},
                            headers={**DUA,"content-type":"application/json"},timeout=20)
     except requests.RequestException as e: sys.exit(f"❌ 连接 Deepvue 失败：{e}")
-    at=(resp.json() if "json" in resp.headers.get("content-type","") else {}).get("accessToken")
-    if not at: sys.exit(f"❌ Deepvue 登录已失效（refreshToken 过期？HTTP {resp.status_code}）。重新抓 token，或把 themes.json 的 backend 改成 tradingview。")
+    data=resp.json() if "json" in resp.headers.get("content-type","") else {}
+    at=data.get("accessToken")
+    if not at: sys.exit(f"❌ Deepvue 登录已失效（refreshToken 过期？HTTP {resp.status_code}）。跑 `python3 update_token.py` 重新导入，或把 themes.json 的 backend 改成 tradingview。")
     tok["accessToken"]=at
+    if data.get("refreshToken"): tok["refreshToken"]=data["refreshToken"]   # rotation-safe: keep the latest
     with open(f"{HOME}/tokens.json","w",encoding="utf-8") as f: json.dump(tok,f,indent=2,ensure_ascii=False)
     H={**DUA,"authorization":f"Bearer {at}"}
     mp_path=f"{HOME}/symbols2_map.json"
