@@ -1,5 +1,8 @@
 # Qullamaggie Screener & Skill
 
+[![validate](https://github.com/HenryVarro666/qullamaggie-screener/actions/workflows/validate.yml/badge.svg)](https://github.com/HenryVarro666/qullamaggie-screener/actions/workflows/validate.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **A Qullamaggie (Kristjan Kullamägi) swing-trading toolkit** — a Claude Code *skill* that
 coaches the method on TradingView, plus an optional auto-scanner that builds a daily
 **Breakout / EP** watchlist. Works with or without Deepvue.
