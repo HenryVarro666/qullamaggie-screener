@@ -2,7 +2,7 @@
   "_meta": {
     "about": "Theme on/off config. enabled:true = include in scan; all false = scan the whole market. tickers are SEEDS (curated examples) — edit freely. 主题开关配置：enabled 控制是否纳入；tickers 是示例种子，自行增删。",
     "rank_by": "perf6M",
-    "breakout_floors": {"price": 1, "adr": 0.03, "perf6M": 0.20, "dollarVol20d": 500000, "perf3M_min": 0.05, "perf1M_min": -0.20},
+    "breakout_floors": {"price": 1, "adr": 0.03, "perf6M": 0.20, "dollarVol20d": 500000, "perf3M_min": 0.05, "perf1M_min": -0.20, "max_off_high": 0.25},
     "ep_rules": {"gap_pct": 0.10, "rel_vol": 1.5, "perf6M_cap": 1.0},
     "output_dir": "~/qmag-scans"
   },

@@ -18,6 +18,7 @@ cfg=rd_json(f"{HOME}/themes.json")
 meta=cfg["_meta"]
 # config defaults so a missing/renamed key never crashes after the scan
 floors={"price":1,"adr":0.03,"perf6M":0.20,"dollarVol20d":500000,"perf3M_min":0.05,"perf1M_min":-0.20,
+        "max_off_high":0.25,
         **meta.get("breakout_floors",{})}
 ep={"gap_pct":0.10,"rel_vol":1.5,"perf6M_cap":1.0, **meta.get("ep_rules",{})}
 OUTDIR=meta.get("output_dir", os.path.join(HOME,"scans"))
@@ -62,8 +63,8 @@ idx_themes={}
 for n in enabled:
     for i in theme_idx[n]: idx_themes.setdefault(i,[]).append(n)
 
-# cols: symIdx,ticker,last,ADR%20d,6M,3M,1M,avg$vol20d,sector, Gap%,RV20,RecentEarnDate(epoch s),%fromLastEarn,%chgToday
-COLUMNS=[0,17,3,1878,278,277,2081,225,20, 260,11,137,457,218]
+# cols: symIdx,ticker,last,ADR%20d,6M,3M,1M,avg$vol20d,sector, Gap%,RV20,RecentEarnDate(epoch s),%fromLastEarn,%chgToday, 52wHigh
+COLUMNS=[0,17,3,1878,278,277,2081,225,20, 260,11,137,457,218, 215]
 
 def load_cookies(path):
     SS={"strict":"Strict","lax":"Lax","no_restriction":"None","none":"None","unspecified":"Lax"}; out=[]
@@ -116,9 +117,15 @@ num=lambda x: x if isinstance(x,(int,float)) else None
 by={r[0]:r for r in res["rows"]}
 NOW=time.time()
 
+def off_high(r):
+    last,hi=num(v(r,3)),num(v(r,215))
+    return (last/hi - 1) if (last and hi and hi>0) else None
 def is_breakout(r):
     last,adr,p6,p3,p1,dv=[num(v(r,c)) for c in (3,1878,278,277,2081,225)]
     if None in (last,adr,p6,p3,p1,dv): return False
+    # 必须贴近 52 周高点：Qullamaggie leader 在高点附近突破，不是离高点一大截的崩塌残骸(挡掉 MNTS 这种暴涨后腰斩)
+    oh=off_high(r)
+    if oh is not None and oh < -floors["max_off_high"]: return False
     return (last>=floors["price"] and adr>=floors["adr"] and p6>=floors["perf6M"] and dv>=floors["dollarVol20d"]
             and p3>=floors["perf3M_min"] and p1>=floors["perf1M_min"] and p6<=20)  # p6<=20(=2000%) drops data glitches
 def days_since_earn(r):
@@ -149,7 +156,7 @@ run_ts=datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 md=[]
 md.append(f"# 主题扫描 {date_str}")
 md.append(f"\n> 运行：{run_ts} ｜ 数据源：Deepvue ｜ 启用主题 {len(enabled)} ｜ 去重标的 {len(all_idx)} ｜ 取到 {len(by)}")
-md.append(f"> 图例：**✓**=Breakout（价≥1·ADR≥3%·6M≥20%·$额≥500K·仍上行）｜ **⚡**=EP（Gap≥{ep['gap_pct']*100:.0f}%·放量≥{ep['rel_vol']}×·前6月涨幅≤{ep['perf6M_cap']*100:.0f}%；财报为主但不限财报）")
+md.append(f"> 图例：**✓**=Breakout（价≥1·ADR≥3%·6M≥20%·$额≥500K·仍上行·**离52周高≤{floors['max_off_high']*100:.0f}%**）｜ **⚡**=EP（Gap≥{ep['gap_pct']*100:.0f}%·放量≥{ep['rel_vol']}×·前6月涨幅≤{ep['perf6M_cap']*100:.0f}%；财报为主但不限财报）")
 md.append("> ✓/⚡ 仅过数值门槛；Stage2 与整理/吸筹形态请在 TradingView 看图终判。\n")
 
 # per-theme sections (show ALL members)
@@ -165,11 +172,11 @@ for name in enabled:
     note=enabled[name].get("note","")
     md.append(f"## {name}　({len(rows)}只 · {nbk}✓ · {nep}⚡)　中位6M {pct(medv)} ｜ 近1月 🟩{up}:🟥{dn}")
     if note: md.append(f"*{note}*")
-    md.append("\n| | Tkr | Last | ADR | 6M | 3M | 1M | Gap | RV | $Vol | Sector |")
-    md.append("|--|--|--:|--:|--:|--:|--:|--:|--:|--:|--|")
+    md.append("\n| | Tkr | Last | ADR | 6M | 3M | 1M | 离高 | Gap | RV | $Vol | Sector |")
+    md.append("|--|--|--:|--:|--:|--:|--:|--:|--:|--:|--:|--|")
     for r in rows:
         fb,fe=flags[r[0]]; mk=("✓" if fb else "")+("⚡" if fe else "")
-        md.append(f"| {mk} | **{v(r,17)}** | {fp(num(v(r,3)))} | {fadr(num(v(r,1878)))} | {pct(num(v(r,278)))} | {pct(num(v(r,277)))} | {pct(num(v(r,2081)))} | {pct1(num(v(r,260)))} | {frv(num(v(r,11)))} | {fvol(num(v(r,225)))} | {v(r,20)} |")
+        md.append(f"| {mk} | **{v(r,17)}** | {fp(num(v(r,3)))} | {fadr(num(v(r,1878)))} | {pct(num(v(r,278)))} | {pct(num(v(r,277)))} | {pct(num(v(r,2081)))} | {pct(off_high(r))} | {pct1(num(v(r,260)))} | {frv(num(v(r,11)))} | {fvol(num(v(r,225)))} | {v(r,20)} |")
     md.append("")
 
 # unique cross-theme hits (dedup by ticker; aggregate theme labels)
@@ -180,7 +187,7 @@ def analysis(r, th):
     p6,p3,p1,adr,gap,rv,dv=[num(v(r,c)) for c in (278,277,2081,1878,260,11,225)]
     fb,fe=flags[r[0]]
     setup="Breakout＋EP" if (fb and fe) else ("Breakout" if fb else "EP")
-    head=(f"- **{v(r,17)}**（{setup}｜{'/'.join(th)}）：6M {pct(p6)}·3M {pct(p3)}·1M {pct(p1)}，"
+    head=(f"- **{v(r,17)}**（{setup}｜{'/'.join(th)}）：6M {pct(p6)}·3M {pct(p3)}·1M {pct(p1)}·离高 {pct(off_high(r))}，"
           f"ADR {fadr(adr)}，20日均额 {fvol(dv)}。")
     if fb:  # Breakout：按延伸程度判断在趋势的哪一段
         if (isinstance(p1,(int,float)) and p1>0.5) or (isinstance(p6,(int,float)) and p6>5):
