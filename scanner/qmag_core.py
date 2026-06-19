@@ -126,6 +126,28 @@ def deepvue_fetch(wanted=None):
 
 def fetch(wanted=None): return (tv_fetch if BACKEND=="tradingview" else deepvue_fetch)(wanted)
 
+# ---------- market environment (Qullamaggie 三道闸门#1：只在牛市交易) ----------
+# 复刻 market-environment.pine 的 NDX MA 堆叠（用 QQQ 代理；EMA20 ≈ pine 的 EMA21）。always TV (no login).
+REGIME_LABEL={"bull":"🟢 牛市","pullback":"🟡 回调","bear":"🔴 熊市","unknown":"⚪ 未知"}
+def market_regime(symbol="NASDAQ:QQQ"):
+    try:
+        r=requests.post("https://scanner.tradingview.com/america/scan",headers={**UA,"content-type":"application/json"},
+            json={"symbols":{"tickers":[symbol]},"columns":["close","EMA10","EMA20","SMA50"]},timeout=20)
+        close,e10,e20,s50=r.json()["data"][0]["d"]
+    except Exception: return ("unknown",{})
+    if None in (e10,e20,s50): return ("unknown",{})
+    if e10>e20>s50: st="bull"                                   # fast>mid>slow 堆叠 = 牛
+    elif e10<e20 and (s50>e10 or s50>e20): st="bear"            # 慢线压住快/中线 = 熊
+    else: st="pullback"                                         # 其余 = 回调/过渡
+    return (st,{"close":close,"ema10":e10,"ema20":e20,"sma50":s50})
+def regime_lines(symbol="NASDAQ:QQQ"):
+    st,d=market_regime(symbol)
+    if not d: return [f"> 市场环境（{symbol.split(':')[-1]}）：{REGIME_LABEL[st]}"]
+    stack=f"EMA10 {d['ema10']:.0f} {'>' if d['ema10']>d['ema20'] else '<'} EMA20 {d['ema20']:.0f} {'>' if d['ema20']>d['sma50'] else '<'} SMA50 {d['sma50']:.0f}"
+    out=[f"> 市场环境（{symbol.split(':')[-1]} {stack}）：**{REGIME_LABEL[st]}**"]
+    if st!="bull": out.append("> ⚠️ **非牛市** —— Qullamaggie 三道闸门第一条（只在牛市交易）不成立；熊市/回调会系统性拉低胜率，建议空仓等待或只做观察。")
+    return out
+
 # ---------- format helpers ----------
 def pct(x): return f"{x*100:+.0f}%" if isinstance(x,(int,float)) else "–"
 def pct1(x): return f"{x*100:+.1f}%" if isinstance(x,(int,float)) else "–"

@@ -15,6 +15,7 @@ top=cands[:N]
 date_str=datetime.datetime.now().strftime("%Y-%m-%d"); run_ts=datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 md=[f"# 全市场 Breakout Top {N} · {date_str}"]
 md.append(f"\n> 运行：{run_ts} ｜ 后端：**{BACKEND}** ｜ 扫描 {len(M)} 只 ｜ Breakout 命中 {len(cands)} ｜ 取前 {len(top)}")
+md+=regime_lines()
 md.append(f"> 口径：价≥1·ADR≥{floors['adr']*100:.0f}%·6M≥{floors['perf6M']*100:.0f}%·$额≥{floors['dollarVol20d']/1e6:.0f}M·Stage2(站50&200日·50>200)·离52周高≤{floors['max_off_high']*100:.0f}%。进场ORH/止损当日低点≤ADR/形态TV终判；非投资建议。\n")
 md.append("| # | Tkr | Last | ADR | 6M | 3M | 1M | 离高 | St2 | $Vol | Sector |")
 md.append("|--:|--|--:|--:|--:|--:|--:|--:|:--:|--:|--|")

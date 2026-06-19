@@ -61,6 +61,12 @@ back to `tradingview`).
 > threshold is tunable in `_meta.breakout_floors` / `_meta.ep_rules` — set them back to the
 > screenshot values for an exact match.
 
+## Market environment (gate #1) / 市场环境
+Every report headers the Qullamaggie bull/bear regime — **QQQ EMA10/20/50 stack** (mirrors
+`assets/market-environment.pine`): 🟢 bull / 🟡 pullback / 🔴 bear. It **warns** when not bullish
+(the method's first gate is *only trade in a bull market*) but does **not** suppress results — you decide.
+每份报告顶部给出牛/回调/熊判断（QQQ 10/20/50 均线堆叠，等价那个判断牛熊的 pine 脚本）；非牛市会提示但不屏蔽结果。
+
 ## Notes / honest limits
 - TradingView backend is **delayed/EOD** (fine for after-close swing screening; intraday/pre-market
   EP is weaker than Deepvue real-time). ADR ≈ TradingView `Volatility.M` (verified near-exact).

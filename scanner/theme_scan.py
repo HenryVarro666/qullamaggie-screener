@@ -38,6 +38,7 @@ def analysis(m,th):
 date_str=datetime.datetime.now().strftime("%Y-%m-%d"); run_ts=datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 md=[f"# 主题扫描 {date_str}"]
 md.append(f"\n> 运行：{run_ts} ｜ 后端：**{BACKEND}** ｜ 启用主题 {len(enabled)} ｜ 标的 {len(all_tickers)} ｜ 取到 {len(M)}")
+reg_lines=regime_lines(); md+=reg_lines
 md.append(f"> 图例：**✓**=Breakout（价≥1·ADR≥{floors['adr']*100:.0f}%·6M≥{floors['perf6M']*100:.0f}%·$额≥{floors['dollarVol20d']/1e6:.0f}M·**Stage2:站50&200日·50>200**·离52周高≤{floors['max_off_high']*100:.0f}%）｜ **⚡**=EP（Gap≥{ep['gap_pct']*100:.0f}%·放量≥{ep['rel_vol']}×·前6月≤{ep['perf6M_cap']*100:.0f}%）")
 md.append("> St2 列：✓=站上50&200日且50>200；50=仅站50日；—=未站50日。✓/⚡仅过数值门槛，整理/吸筹形态仍须看图终判。\n")
 for name in enabled:
@@ -77,6 +78,7 @@ md.append(f"\n---\n*后端={BACKEND}；口径在 `themes.json` 调（backend/bre
 
 os.makedirs(OUTDIR, exist_ok=True); out_path=os.path.join(OUTDIR, f"{date_str}.md")
 with open(out_path,"w",encoding="utf-8") as f: f.write("\n".join(md))
+print(reg_lines[0].lstrip("> ").replace("**",""))
 print(f"后端 {BACKEND} ｜ 主题 {len(enabled)} ｜ 标的 {len(all_tickers)} ｜ 取到 {len(M)}")
 if unresolved:
     for k,vv in unresolved.items(): print(f"  ⚠️ {k}: {', '.join(vv)}")
