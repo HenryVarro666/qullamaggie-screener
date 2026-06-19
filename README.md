@@ -74,7 +74,7 @@ per **[`scanner/AUTH_SETUP.md`](scanner/AUTH_SETUP.md)** (`pip install playwrigh
 ## The method in one screen / 一屏看懂口径
 
 - **Breakout ✓**: big prior move → orderly tightening pullback hugging rising MAs → volume
-  breakout. Screen ≈ `price≥1 · ADR%≥3 · 6M perf≥20% · 20d $vol≥$5M · within 25% of 52w high ·
+  breakout. Screen ≈ `price≥1 · ADR%≥3 · 6M perf≥20% · 20d $vol≥$1M · within 25% of 52w high ·
   Stage 2 (above 50- & 200-day MA, 50>200)`.
 - **EP ⚡** (Episodic Pivot): earnings-driven gap on a quiet stock. Screen ≈ `gap≥10% ·
   rel-vol≥1.5 · prior 6M not already run · recent earnings (≤5d) + strong EPS growth (≥25%)`.
