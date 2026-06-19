@@ -37,9 +37,11 @@ back to `tradingview`).
 ## Files
 | File | What |
 |--|--|
-| `theme_scan.py` | Main. Dual-backend theme scan → daily report with ✓/⚡ + analysis. |
+| `qmag_core.py` | Shared core: config, strict predicates, dual-backend fetchers (TradingView / Deepvue), formatters. |
+| `theme_scan.py` | Theme-grouped scan → daily report with ✓/⚡ + per-stock analysis. |
+| `breakout_top10.py` | **Whole-market** Breakout Top-N (dual backend; equities only — excludes leveraged ETFs). `TOPN=25 python3 breakout_top10.py`. |
 | `themes.example.json` | Template config (backend, themes, thresholds) — copy to `~/.deepvue/themes.json`. |
-| `breakout_top10.py` | Deepvue-only whole-market Breakout Top-10 (legacy, console). |
+| `update_token.py` | Deepvue token helper: one-command import + `--refresh`. |
 | `AUTH_SETUP.md` | How to supply your own Deepvue session (Deepvue backend only). |
 
 ## The screen (strict — follows the method)
