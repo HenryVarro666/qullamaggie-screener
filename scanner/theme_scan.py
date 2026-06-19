@@ -19,21 +19,37 @@ for k,ts in theme_tickers.items():
 
 def analysis(m,th):
     fb,fe=flags[m["ticker"]]; setup="Breakout＋EP" if (fb and fe) else ("Breakout" if fb else "EP")
-    head=(f"- **{m['ticker']}**（{setup}｜{'/'.join(th)}）：6M {pct(m['p6'])}·3M {pct(m['p3'])}·1M {pct(m['p1'])}·离高 {pct(m['off_high'])}，ADR {fadr(m['adr'])}，$额 {fvol(m['dollar_vol'])}。")
+    p6,p3,p1,adr,gap,rv,dv,oh=m["p6"],m["p3"],m["p1"],m["adr"],m["gap"],m["relvol"],m["dollar_vol"],m["off_high"]
+    eg,dse=m.get("eps_growth"),m.get("days_since_earn")
+    # —— 选中理由（逐条对应过的门槛）——
+    why=[f"6M {pct(p6)}·3M {pct(p3)}·1M {pct(p1)}（{'三周期共振、当下领涨' if (isinstance(p3,(int,float)) and p3>0.2) else '半年维度领涨'}）"]
     if fb:
-        p1,p6,p3=m["p1"],m["p6"],m["p3"]
+        why.append("站稳 50/200 日线且 50>200 → **Stage 2 多头排列**")
+        why.append(f"离52周高 {pct(oh)} → {'贴着高点蓄势（不是暴涨后的残骸）' if (isinstance(oh,(int,float)) and oh>-0.10) else '仍在 25% 阈值内、偏离 base'}")
+    why.append(f"ADR {fadr(adr)}（爆发力够）·20日均额 {fvol(dv)}（流动性）")
+    if fe:
+        why.append(f"今日 Gap {pct1(gap)}·放量 {frv(rv)}" + (f"·EPS同比 {eg:+.0f}%·距财报 {dse:.0f}d → **财报型 EP**" if isinstance(eg,(int,float)) and isinstance(dse,(int,float)) else " → EP"))
+    # —— 阶段判断 + 该股专属注意点 ——
+    note=[]
+    if fb:
         if (isinstance(p1,(int,float)) and p1>0.5) or (isinstance(p6,(int,float)) and p6>5):
-            body="已大幅延伸/偏抛物线——按方法属**突破后期**，别追高，等回调收紧成新 base 再看 ORH。"
+            note.append("**已大幅延伸/偏抛物线（突破后期）**——别追高，现价进盈亏比差，等它回调收紧成新 base 再在 ORH 进")
         elif isinstance(p1,(int,float)) and -0.12<=p1<=0.25 and (p3 or 0)>0.2:
-            body="**站上 50/200 日线 + 近月在整理**——较符合 breakout 候选，等放量突破开盘区间高点(ORH)进。"
-        else: body="站上均线、仍在上升趋势中，跟住趋势、回调不破位即持有。"
-        if fe: body+=f" 另今日 Gap {pct1(m['gap'])}/放量 {frv(m['relvol'])} 同时触发 **EP**。"
-    else:
-        eg=m.get('eps_growth'); dse=m.get('days_since_earn')
-        egs=f"，EPS增长 {eg:+.0f}%" if isinstance(eg,(int,float)) else ""
-        dss=f"，距财报 {dse:.0f}d" if isinstance(dse,(int,float)) else ""
-        body=f"今日 Gap {pct1(m['gap'])}、放量 {frv(m['relvol'])}{egs}{dss}，前期低迷(6M {pct(m['p6'])})——**财报型 EP**；盯当日 **ORH** 进、**当日低点**止损，放量不续则放弃。"
-    return head+body
+            note.append("**强势 + 近月在整理（较理想的 breakout 候选）**——等放量突破开盘区间高点(ORH)进")
+        else:
+            note.append("站上均线、趋势延续——跟随趋势，回调不破位即持有")
+    elif fe:
+        note.append("**冷门股被意外利好点燃**——盯当日 ORH 进、当日低点止损；盘前没放量则要求开盘 15-30 分钟内放到日均量，量不续即放弃")
+    if isinstance(dv,(int,float)) and dv<50e6: note.append(f"⚠️ 成交额偏薄（{fvol(dv)}）→ 流动性/滑点风险，仓位别大")
+    if isinstance(adr,(int,float)) and adr>=0.12: note.append(f"⚠️ 高波动（ADR {fadr(adr)}）→ 止损按 ADR 放宽、仓位相应缩小")
+    if isinstance(oh,(int,float)) and oh<-0.18: note.append(f"⚠️ 已离高 {pct(oh)} → 偏离 base，确认是回踩而非破位再动")
+    if isinstance(p1,(int,float)) and p1<-0.05 and fb: note.append(f"⚠️ 近1月 {pct(p1)} 在回调 → 等企稳重新站上短均线再考虑")
+    if fe and isinstance(dse,(int,float)) and dse<=5: note.append("⚠️ 紧贴财报 → 注意财报后的二次波动/回吐")
+    return "\n".join([
+        f"- **{m['ticker']}**（{setup}｜{'/'.join(th)}｜{m['sector']}）",
+        "  - **选中理由**：" + "；".join(why) + "。",
+        "  - **阶段与注意**：" + "；".join(note) + "。",
+    ])
 
 date_str=datetime.datetime.now().strftime("%Y-%m-%d"); run_ts=datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 md=[f"# 主题扫描 {date_str}"]
