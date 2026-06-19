@@ -4,6 +4,7 @@
 # Shared backend/predicate logic lives in qmag_core.py.
 import datetime, statistics, os, sys
 from qmag_core import *
+from charts import ensure_charts
 
 enabled={k:v for k,v in cfg["themes"].items() if v.get("enabled")}
 theme_tickers={k:list(dict.fromkeys(v["tickers"])) for k,v in enabled.items()}
@@ -17,39 +18,7 @@ idx_themes={}
 for k,ts in theme_tickers.items():
     for t in ts: idx_themes.setdefault(t,[]).append(k)
 
-def analysis(m,th):
-    fb,fe=flags[m["ticker"]]; setup="Breakout＋EP" if (fb and fe) else ("Breakout" if fb else "EP")
-    p6,p3,p1,adr,gap,rv,dv,oh=m["p6"],m["p3"],m["p1"],m["adr"],m["gap"],m["relvol"],m["dollar_vol"],m["off_high"]
-    eg,dse=m.get("eps_growth"),m.get("days_since_earn")
-    # —— 选中理由（逐条对应过的门槛）——
-    why=[f"6M {pct(p6)}·3M {pct(p3)}·1M {pct(p1)}（{'三周期共振、当下领涨' if (isinstance(p3,(int,float)) and p3>0.2) else '半年维度领涨'}）"]
-    if fb:
-        why.append("站稳 50/200 日线且 50>200 → **Stage 2 多头排列**")
-        why.append(f"离52周高 {pct(oh)} → {'贴着高点蓄势（不是暴涨后的残骸）' if (isinstance(oh,(int,float)) and oh>-0.10) else '仍在 25% 阈值内、偏离 base'}")
-    why.append(f"ADR {fadr(adr)}（爆发力够）·20日均额 {fvol(dv)}（流动性）")
-    if fe:
-        why.append(f"今日 Gap {pct1(gap)}·放量 {frv(rv)}" + (f"·EPS同比 {eg:+.0f}%·距财报 {dse:.0f}d → **财报型 EP**" if isinstance(eg,(int,float)) and isinstance(dse,(int,float)) else " → EP"))
-    # —— 阶段判断 + 该股专属注意点 ——
-    note=[]
-    if fb:
-        if (isinstance(p1,(int,float)) and p1>0.5) or (isinstance(p6,(int,float)) and p6>5):
-            note.append("**已大幅延伸/偏抛物线（突破后期）**——别追高，现价进盈亏比差，等它回调收紧成新 base 再在 ORH 进")
-        elif isinstance(p1,(int,float)) and -0.12<=p1<=0.25 and (p3 or 0)>0.2:
-            note.append("**强势 + 近月在整理（较理想的 breakout 候选）**——等放量突破开盘区间高点(ORH)进")
-        else:
-            note.append("站上均线、趋势延续——跟随趋势，回调不破位即持有")
-    elif fe:
-        note.append("**冷门股被意外利好点燃**——盯当日 ORH 进、当日低点止损；盘前没放量则要求开盘 15-30 分钟内放到日均量，量不续即放弃")
-    if isinstance(dv,(int,float)) and dv<50e6: note.append(f"⚠️ 成交额偏薄（{fvol(dv)}）→ 流动性/滑点风险，仓位别大")
-    if isinstance(adr,(int,float)) and adr>=0.12: note.append(f"⚠️ 高波动（ADR {fadr(adr)}）→ 止损按 ADR 放宽、仓位相应缩小")
-    if isinstance(oh,(int,float)) and oh<-0.18: note.append(f"⚠️ 已离高 {pct(oh)} → 偏离 base，确认是回踩而非破位再动")
-    if isinstance(p1,(int,float)) and p1<-0.05 and fb: note.append(f"⚠️ 近1月 {pct(p1)} 在回调 → 等企稳重新站上短均线再考虑")
-    if fe and isinstance(dse,(int,float)) and dse<=5: note.append("⚠️ 紧贴财报 → 注意财报后的二次波动/回吐")
-    return "\n".join([
-        f"- **{m['ticker']}**（{setup}｜{'/'.join(th)}｜{m['sector']}）",
-        "  - **选中理由**：" + "；".join(why) + "。",
-        "  - **阶段与注意**：" + "；".join(note) + "。",
-    ])
+# 逐只详细分析 analysis(m, themes, fb, fe) 已移到 qmag_core.py（与 ready_top10.py 共用一份）
 
 date_str=datetime.datetime.now().strftime("%Y-%m-%d"); run_ts=datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 md=[f"# 主题扫描 {date_str}"]
@@ -75,17 +44,23 @@ for name in enabled:
 bk={t:(m,idx_themes.get(t,[])) for t,m in M.items() if flags[t][0]}
 ep_hits={t:(m,idx_themes.get(t,[])) for t,m in M.items() if flags[t][1]}
 bk_sorted=sorted(bk.values(), key=lambda x:(x[0]["p6"] if x[0]["p6"] is not None else -9), reverse=True)
+chart_syms={t:tv_symbol(M[t]) for t in (set(bk)|set(ep_hits))}            # 命中票各截一张 TV 日K
+print("配图（TradingView 日K截图）…")
+cm=ensure_charts(chart_syms, date_str, print)
 md.append(f"---\n## 🏆 Breakout 命中 · 逐只分析（按6M，共{len(bk_sorted)}只）")
 md.append("> 纪律：进场=**开盘区间高点 ORH** 突破；止损=**当日低点**且宽度≤ADR；进场3-5天卖1/3~1/2并移止损到保本，余仓 EMA10/20 trailing；**整理/吸筹形态务必在 TradingView 看图终判**。\n")
 if bk_sorted:
     for i,(m,th) in enumerate(bk_sorted,1):
-        md.append(analysis(m,th))
+        blk=analysis(m,th,*flags[m["ticker"]]); rel=cm.get(m["ticker"])
+        md.append(blk + (f"\n  - ![{m['ticker']} 日K]({rel})" if rel else ""))
         if i==10 and len(bk_sorted)>10: md.append("\n*——— 以上为 Top 10（其余按6M续列）———*\n")
 else: md.append("_今日无 Breakout 命中。_")
 ep_sorted=sorted(ep_hits.values(), key=lambda x:(x[0]["gap"] if x[0]["gap"] is not None else -9), reverse=True)
 md.append(f"\n## ⚡ EP 命中 · 逐只分析（按 Gap%，共{len(ep_sorted)}只）")
 if ep_sorted:
-    for m,th in ep_sorted: md.append(analysis(m,th))
+    for m,th in ep_sorted:
+        blk=analysis(m,th,*flags[m["ticker"]]); rel=cm.get(m["ticker"])
+        md.append(blk + (f"\n  - ![{m['ticker']} 日K]({rel})" if rel else ""))
 else: md.append("_今日无 EP 命中（事件驱动跳空较罕见；非交易日/盘后数据可能无当日跳空）。_")
 if unresolved:
     md.append("\n---\n## ⚠️ 未取到数据的 ticker（退市/非美股/拼写）")

@@ -18,8 +18,9 @@ coaches the method on TradingView, plus an optional auto-scanner that builds a d
 ## 📊 Example daily report / 每日报告示例
 
 The scanner writes a heatmap-style markdown report grouped by theme, with per-stock
-**Breakout ✓ / EP ⚡** flags and analysis. (The TradingView fallback produces the same screen,
-done by hand.) 扫描器输出按主题分组的每日报告，每只带 Breakout/EP 标记与分析：
+**Breakout ✓ / EP ⚡** flags, analysis, and an embedded **TradingView daily chart** per pick. (The
+TradingView fallback produces the same screen, done by hand.) 扫描器输出按主题分组的每日报告，每只带
+Breakout/EP 标记、分析与一张 TradingView 日K图：
 
 ![Example daily report](docs/example-report.png)
 
@@ -32,7 +33,7 @@ done by hand.) 扫描器输出按主题分组的每日报告，每只带 Breakou
 | `skills/qullamaggie-swing-trading/` | The **Claude Code skill** — method, screening, entry/stop/exit, risk sizing, market-environment gating. Chinese. |
 | `skills/.../references/tradingview-screener.md` | **No-Deepvue TradingView fallback** — how to screen Breakout/EP in TradingView's built-in screener. |
 | `skills/.../assets/*.pine` | TradingView Pine: market-environment regime + a Breakout/EP flag-and-alert helper. |
-| `scanner/` | **Optional** Deepvue auto-scanner (needs your own paid account). Daily theme-grouped report. |
+| `scanner/` | **Optional** auto-scanner (TradingView no-login, or Deepvue). Three tools — theme heatmap, *"buyable Top 10"*, and whole-market Breakout Top-N — each with per-stock analysis + an embedded TradingView daily chart. |
 
 ---
 
@@ -52,13 +53,21 @@ Or use it as a plugin (the repo ships a `.claude-plugin/plugin.json`). Manual co
 reliable path.
 
 ### B. Auto-scanner — TradingView backend, **no login** (everyone) / 自动扫描（TradingView，免登录）
-The scanner now runs on **TradingView's public scan endpoint by default — no account, no token** —
-and writes a daily heatmap-style report grouped by theme with **Breakout ✓ / EP ⚡** flags + analysis.
-扫描器默认走 **TradingView 公开接口，无需登录/账号**，每天出按主题分组的报告。
+Runs on **TradingView's public scan endpoint by default — no account, no token** — and writes daily
+reports with **Breakout ✓ / EP ⚡** flags, per-stock analysis, and an **embedded TradingView daily
+chart for every pick**. Three scanners (all share one strict core):
+- **`theme_scan.py`** — theme heatmap of the baskets you track.
+- **`ready_top10.py`** — *"buyable Top 10"*: Breakouts **coiling near the highs, ready to go** (not the
+  over-extended names a 6-month ranking floats to the top); whole-market + your themes in one report.
+- **`breakout_top10.py`** — whole-market Breakout Top-N.
+
+扫描器默认走 **TradingView 公开接口，无需登录/账号**；三个脚本 = 主题热力图 / 可买Top10 / 全市场Top，
+每只选出的票都内嵌一张 TradingView 日K图。
 ```bash
 pip install -r requirements.txt
+playwright install chromium                             # for the embedded chart screenshots (or CHARTS=0 to skip)
 cp scanner/themes.example.json ~/.deepvue/themes.json   # backend already "tradingview"
-python3 scanner/theme_scan.py
+python3 scanner/ready_top10.py                          # or theme_scan.py / breakout_top10.py
 ```
 See **[`scanner/README.md`](scanner/README.md)**. (Prefer a manual workflow? The TradingView Stock
 Screener guide is in [`tradingview-screener.md`](skills/qullamaggie-swing-trading/references/tradingview-screener.md),

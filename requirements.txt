@@ -1,5 +1,7 @@
-# Deepvue scanner dependencies (scanner/ only — the skill itself needs nothing).
+# Scanner dependencies (scanner/ only — the skill itself needs nothing).
 requests>=2.31
 playwright>=1.40
-# After install, download the browser once:
+# playwright is used for: (a) the Deepvue backend, and (b) the TradingView daily-chart
+# screenshots embedded in reports (default ON). After install, download the browser once:
 #   playwright install chromium
+# Don't want charts / no browser? Run with CHARTS=0 (TradingView scan backend needs no browser).

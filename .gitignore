@@ -5,11 +5,12 @@ symbols2_map.json
 .deepvue/
 *.local.json
 
-# ── Scan outputs ──
+# ── Scan outputs (reports + generated TradingView chart PNGs) ──
 扫描结果/
 qmag-scans/
 *-scans/
 scans/
+charts/
 
 # ── Python ──
 __pycache__/

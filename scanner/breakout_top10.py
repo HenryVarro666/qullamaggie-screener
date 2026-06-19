@@ -4,6 +4,7 @@
 #   Deepvue backend: own paid account (slower for whole market). Override per run: SCAN_BACKEND=tradingview / TOPN=25.
 import datetime, os, sys
 from qmag_core import *
+from charts import ensure_charts
 
 N=int(os.environ.get("TOPN","25"))
 M=fetch(None)                                   # None = whole US universe
@@ -13,6 +14,8 @@ cands.sort(key=lambda m:(m["p6"] if m["p6"] is not None else -9), reverse=True)
 top=cands[:N]
 
 date_str=datetime.datetime.now().strftime("%Y-%m-%d"); run_ts=datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+print("配图（TradingView 日K截图）…")
+cm=ensure_charts({m["ticker"]:tv_symbol(m) for m in top}, date_str, print)
 md=[f"# 全市场 Breakout Top {N} · {date_str}"]
 md.append(f"\n> 运行：{run_ts} ｜ 后端：**{BACKEND}** ｜ 扫描 {len(M)} 只 ｜ Breakout 命中 {len(cands)} ｜ 取前 {len(top)}")
 md+=regime_lines()
@@ -21,6 +24,13 @@ md.append("| # | Tkr | Last | ADR | 6M | 3M | 1M | 离高 | St2 | $Vol | Sector 
 md.append("|--:|--|--:|--:|--:|--:|--:|--:|:--:|--:|--|")
 for i,m in enumerate(top,1):
     md.append(f"| {i} | **{m['ticker']}** | {fp(m['last'])} | {fadr(m['adr'])} | {pct(m['p6'])} | {pct(m['p3'])} | {pct(m['p1'])} | {pct(m['off_high'])} | {st2(m)} | {fvol(m['dollar_vol'])} | {m['sector']} |")
+
+if any(cm.get(m["ticker"]) for m in top):
+    md.append("\n## 📈 日K图（按上表顺序）")
+    for i,m in enumerate(top,1):
+        rel=cm.get(m["ticker"])
+        md.append(f"\n**{i}. {m['ticker']}**　{pct(m['p6'])} 6M · ADR {fadr(m['adr'])} · 离高 {pct(m['off_high'])}")
+        md.append(f"![{m['ticker']} 日K]({rel})" if rel else "_(图未生成)_")
 
 os.makedirs(OUTDIR, exist_ok=True); out_path=os.path.join(OUTDIR, f"breakout-top{N}-{date_str}.md")
 with open(out_path,"w",encoding="utf-8") as f: f.write("\n".join(md))
