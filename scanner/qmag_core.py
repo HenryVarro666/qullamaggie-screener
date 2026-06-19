@@ -11,7 +11,8 @@ cfg=rd_json(f"{HOME}/themes.json"); meta=cfg["_meta"]
 BACKEND=os.environ.get("SCAN_BACKEND", meta.get("backend","tradingview")).lower()  # SCAN_BACKEND env overrides config
 floors={"price":1,"adr":0.03,"perf6M":0.20,"dollarVol20d":5_000_000,"perf3M_min":0.05,"perf1M_min":-0.20,
         "max_off_high":0.25,"require_stage2":True,"require_ma_stack":True, **meta.get("breakout_floors",{})}
-ep={"gap_pct":0.10,"rel_vol":1.5,"perf6M_cap":1.0,"min_dollar_vol":floors["dollarVol20d"], **meta.get("ep_rules",{})}
+ep={"gap_pct":0.10,"rel_vol":1.5,"perf6M_cap":1.0,"min_dollar_vol":floors["dollarVol20d"],
+    "require_earnings":True,"max_days_since_earnings":5,"min_eps_growth_pct":25, **meta.get("ep_rules",{})}
 OUTDIR=os.path.expanduser(meta.get("output_dir", os.path.join(HOME,"scans")))
 NOW=time.time()
 UA={"user-agent":"Mozilla/5.0"}
@@ -27,13 +28,19 @@ def is_breakout(m):
             and m["p1"]>=floors["perf1M_min"] and m["p6"]<=20)  # p6<=20(=2000%) drops data glitches
 def is_ep(m):
     if any(m.get(k) is None for k in ("last","dollar_vol","gap","relvol","p6")): return False
-    return (m["gap"]>=ep["gap_pct"] and m["relvol"]>=ep["rel_vol"] and m["last"]>=floors["price"]
-            and m["dollar_vol"]>=ep["min_dollar_vol"] and m["p6"]<=ep["perf6M_cap"])
+    if not (m["gap"]>=ep["gap_pct"] and m["relvol"]>=ep["rel_vol"] and m["last"]>=floors["price"]
+            and m["dollar_vol"]>=ep["min_dollar_vol"] and m["p6"]<=ep["perf6M_cap"]): return False
+    if ep["require_earnings"]:   # 财报型 EP：近财报 + 强劲 EPS 增长（贴源 EP 选股器的财务列；设 false 可含非财报催化）
+        dse=m.get("days_since_earn"); eg=m.get("eps_growth")
+        if dse is None or dse>ep["max_days_since_earnings"]: return False
+        if eg is None or eg<ep["min_eps_growth_pct"]: return False
+    return True
 
 # ---------- backend: TradingView (public scan endpoint, no login). wanted=None → whole US universe ----------
 def tv_fetch(wanted=None):
     cols=["name","close","Perf.6M","Perf.3M","Perf.1M","Volatility.M","average_volume_30d_calc",
-          "price_52_week_high","SMA50","SMA200","gap","relative_volume_10d_calc","earnings_release_date","sector","type"]
+          "price_52_week_high","SMA50","SMA200","gap","relative_volume_10d_calc","earnings_release_date","sector","type",
+          "earnings_per_share_diluted_yoy_growth_fq"]
     # no is_primary filter: US-listed ADRs (ASX, ALM…) have foreign primary listings and would be dropped
     payload={"filter":[{"left":"close","operation":"greater","right":0.5},
                        {"left":"exchange","operation":"in_range","right":["NASDAQ","NYSE","AMEX"]}],
@@ -58,6 +65,7 @@ def tv_fetch(wanted=None):
               "ma50_gt_200":(s50>s200) if (s50 and s200) else None,
               "gap":(n(d["gap"]) or 0)/100 if n(d["gap"]) is not None else None,
               "relvol":n(d["relative_volume_10d_calc"]),"type":d.get("type"),
+              "eps_growth":n(d.get("earnings_per_share_diluted_yoy_growth_fq")),
               "days_since_earn":((NOW-ern)/86400.0) if ern else None}
     return M
 
@@ -86,7 +94,7 @@ def deepvue_fetch(wanted=None):
     if wanted is None: wanted=set(tkr2idx.keys())                          # whole market
     idxs=[tkr2idx[t] for t in wanted if t in tkr2idx]; idx2tkr={tkr2idx[t]:t for t in wanted if t in tkr2idx}
     if not idxs: return {}
-    C=[0,3,1878,278,277,2081,225,20,260,11,137,215,284,286]  # idx,last,ADR,6M,3M,1M,$vol,sector,gap,RV,earn,52wHi,pvs50,pvs200
+    C=[0,3,1878,278,277,2081,225,20,260,11,137,215,284,286,1576]  # …pvs200,EPSgrowthQtr
     def load_cookies(path):
         SS={"strict":"Strict","lax":"Lax","no_restriction":"None","none":"None","unspecified":"Lax"};out=[]
         for c in rd_json(path):
@@ -112,7 +120,8 @@ def deepvue_fetch(wanted=None):
               "dollar_vol":n(g(225)),"sector":g(20) or "N/A","off_high":(last/hi-1) if (last and hi) else None,
               "above_50d":(pv50>0) if pv50 is not None else None,"above_200d":(pv200>0) if pv200 is not None else None,
               "ma50_gt_200":(pv50<pv200) if (pv50 is not None and pv200 is not None) else None,  # 价离50d更近⟺50d>200d
-              "gap":n(g(260)),"relvol":n(g(11)),"type":None,"days_since_earn":((NOW-n(g(137)))/86400.0) if n(g(137)) else None}
+              "gap":n(g(260)),"relvol":n(g(11)),"type":None,"eps_growth":n(g(1576)),
+              "days_since_earn":((NOW-n(g(137)))/86400.0) if n(g(137)) else None}
     return M
 
 def fetch(wanted=None): return (tv_fetch if BACKEND=="tradingview" else deepvue_fetch)(wanted)

@@ -5,7 +5,7 @@
     "_backend_help": "tradingview = no login, free, public scan endpoint (default). deepvue = your own paid account (exact ADR, real-time); see AUTH_SETUP.md.",
     "rank_by": "perf6M",
     "breakout_floors": {"price": 1, "adr": 0.03, "perf6M": 0.20, "dollarVol20d": 5000000, "perf3M_min": 0.05, "perf1M_min": -0.20, "max_off_high": 0.25, "require_stage2": true, "require_ma_stack": true},
-    "ep_rules": {"gap_pct": 0.10, "rel_vol": 1.5, "perf6M_cap": 1.0, "min_dollar_vol": 5000000},
+    "ep_rules": {"gap_pct": 0.10, "rel_vol": 1.5, "perf6M_cap": 1.0, "min_dollar_vol": 5000000, "require_earnings": true, "max_days_since_earnings": 5, "min_eps_growth_pct": 25},
     "output_dir": "~/qmag-scans"
   },
   "themes": {

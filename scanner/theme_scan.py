@@ -29,7 +29,10 @@ def analysis(m,th):
         else: body="站上均线、仍在上升趋势中，跟住趋势、回调不破位即持有。"
         if fe: body+=f" 另今日 Gap {pct1(m['gap'])}/放量 {frv(m['relvol'])} 同时触发 **EP**。"
     else:
-        body=f"今日 Gap {pct1(m['gap'])}、放量 {frv(m['relvol'])}，前期低迷(6M {pct(m['p6'])})——正合 EP 的**冷门股意外异动**；盯当日 **ORH** 进、**当日低点**止损，放量不续则放弃。"
+        eg=m.get('eps_growth'); dse=m.get('days_since_earn')
+        egs=f"，EPS增长 {eg:+.0f}%" if isinstance(eg,(int,float)) else ""
+        dss=f"，距财报 {dse:.0f}d" if isinstance(dse,(int,float)) else ""
+        body=f"今日 Gap {pct1(m['gap'])}、放量 {frv(m['relvol'])}{egs}{dss}，前期低迷(6M {pct(m['p6'])})——**财报型 EP**；盯当日 **ORH** 进、**当日低点**止损，放量不续则放弃。"
     return head+body
 
 date_str=datetime.datetime.now().strftime("%Y-%m-%d"); run_ts=datetime.datetime.now().strftime("%Y-%m-%d %H:%M")

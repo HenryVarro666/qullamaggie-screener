@@ -44,16 +44,22 @@ back to `tradingview`).
 | `update_token.py` | Deepvue token helper: one-command import + `--refresh`. |
 | `AUTH_SETUP.md` | How to supply your own Deepvue session (Deepvue backend only). |
 
-## The screen (strict — follows the method)
+## The screen (strict mode)
 - **Breakout ✓**: `price≥1` · `ADR%≥3` · `6M perf≥20%` · `20d $vol≥$5M` · still trending
   (`3M≥+5%`, `1M≥−20%`) · **within 25% of the 52-week high** · **Stage 2: above the 50- & 200-day
   MA, with 50DMA > 200DMA**. Ranked by 6-month performance.
-- **EP ⚡**: `gap≥10%` · `relative volume≥1.5×` · `prior 6M ≤ 100%` (a quiet stock surprised) ·
-  liquidity. Earnings-driven is the main case, not required.
+- **EP ⚡** (财报型): `gap≥10%` · `relative volume≥1.5×` · `prior 6M ≤ 100%` · liquidity ·
+  **recent earnings (≤5 trading days) + strong EPS YoY growth (≥25%)**. Set
+  `ep_rules.require_earnings:false` to also include non-earnings catalysts (FDA/regulatory/macro).
 
-The **near-high + Stage-2** gates are what keep blown-off ex-runners (e.g. a stock spiked then
-−70% off its high) out of the Breakout list. All thresholds live in `_meta.breakout_floors` /
-`_meta.ep_rules`.
+> **Note — this is stricter than Qullamaggie's original Deepvue screener.** Those screenshots
+> hard-filter only the **core** values (Breakout: ADR≥3%·Price≥1·Perf6M≥20%·$vol≥**500K**; EP:
+> Price≥1·pre-mkt gap≥10%) and leave MA/Stage/earnings/growth as *view columns* for the eye. This
+> tool promotes them to **hard gates** (matching the method's text: only Stage 2, big volume,
+> earnings-driven EP) and raises liquidity to $5M. The **near-high + Stage-2** gates are what keep
+> blown-off ex-runners (e.g. a stock spiked then −70% off its high) out of the list. Every
+> threshold is tunable in `_meta.breakout_floors` / `_meta.ep_rules` — set them back to the
+> screenshot values for an exact match.
 
 ## Notes / honest limits
 - TradingView backend is **delayed/EOD** (fine for after-close swing screening; intraday/pre-market

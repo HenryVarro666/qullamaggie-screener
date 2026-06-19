@@ -76,8 +76,9 @@ per **[`scanner/AUTH_SETUP.md`](scanner/AUTH_SETUP.md)** (`pip install playwrigh
 - **Breakout ✓**: big prior move → orderly tightening pullback hugging rising MAs → volume
   breakout. Screen ≈ `price≥1 · ADR%≥3 · 6M perf≥20% · 20d $vol≥$5M · within 25% of 52w high ·
   Stage 2 (above 50- & 200-day MA, 50>200)`.
-- **EP ⚡** (Episodic Pivot): surprise catalyst gap on a quiet stock. Screen ≈ `gap≥10% ·
-  rel-vol≥1.5 · prior 6M not already run`. Earnings is the main case, not the only one.
+- **EP ⚡** (Episodic Pivot): earnings-driven gap on a quiet stock. Screen ≈ `gap≥10% ·
+  rel-vol≥1.5 · prior 6M not already run · recent earnings (≤5d) + strong EPS growth (≥25%)`.
+  (`ep_rules.require_earnings:false` re-includes non-earnings catalysts.)
 - **Entry** = open-range high (ORH). **Stop** = day's low, width ≤ ADR. **Exit** = sell ⅓–½ in
   3–5 days + move stop to breakeven, trail the rest on EMA10/20. Risk ≤ 0.5% of account per trade.
 - Only in a **bull market** (QQQ/NDX weekly), only **hot themes**, only **Stage 2** leaders.
