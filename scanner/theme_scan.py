@@ -9,7 +9,7 @@ HOME=os.environ.get("DEEPVUE_DIR", os.path.expanduser("~/.deepvue"))
 def rd_json(p):
     with open(p, encoding="utf-8") as f: return json.load(f)
 cfg=rd_json(f"{HOME}/themes.json"); meta=cfg["_meta"]
-BACKEND=meta.get("backend","tradingview").lower()
+BACKEND=os.environ.get("SCAN_BACKEND", meta.get("backend","tradingview")).lower()  # SCAN_BACKEND env overrides config
 floors={"price":1,"adr":0.03,"perf6M":0.20,"dollarVol20d":5_000_000,"perf3M_min":0.05,"perf1M_min":-0.20,
         "max_off_high":0.25,"require_stage2":True,"require_ma_stack":True, **meta.get("breakout_floors",{})}
 ep={"gap_pct":0.10,"rel_vol":1.5,"perf6M_cap":1.0,"min_dollar_vol":floors["dollarVol20d"], **meta.get("ep_rules",{})}

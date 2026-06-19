@@ -51,9 +51,13 @@ def do_import():
                  "   复制后直接跑本脚本（读剪贴板），或 `pbpaste | python3 update_token.py`，或 --file dump.json")
     try: obj=json.loads(raw)
     except Exception as e: sys.exit(f"❌ 输入不是合法 JSON：{e}")
-    ls=obj.get("localStorage", obj)   # 接受完整 dump 或直接的 localStorage 对象
-    field={"accessToken":"accessToken","refreshToken":"refreshToken","deviceId":"deviceId","chartDeviceId":"deepvue-chart-device-id"}
-    out={k:ls[src] for k,src in field.items() if ls.get(src)}
+    ls=obj.get("localStorage", obj)   # 接受完整 dump、localStorage 对象、或定向命令的扁平 blob
+    field={"accessToken":["accessToken"],"refreshToken":["refreshToken"],"deviceId":["deviceId"],
+           "chartDeviceId":["deepvue-chart-device-id","chartDeviceId"]}   # 两种键名都认
+    out={}
+    for k,srcs in field.items():
+        for s in srcs:
+            if ls.get(s): out[k]=ls[s]; break
     if not out.get("refreshToken"): sys.exit("❌ 没找到 refreshToken（确认是在已登录的 app.deepvue.com 上跑的 Console 命令）。")
     os.makedirs(HOME,exist_ok=True)
     json.dump(out, open(TOK,"w",encoding="utf-8"), indent=2, ensure_ascii=False); os.chmod(TOK,0o600)
