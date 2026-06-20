@@ -8,6 +8,10 @@
     "ep_rules": {"gap_pct": 0.10, "rel_vol": 1.5, "perf6M_cap": 1.0, "min_dollar_vol": 1000000, "require_earnings": true, "max_days_since_earnings": 5, "min_eps_growth_pct": 25},
     "_ready_help": "ready_top10.py only: from Breakout hits, keep 'ready/buyable' setups (near 52w high + last-month consolidation + liquidity), ranked by readiness = off_high - |1M| + ADR*adr_weight. 就绪/可买筛选与排序。",
     "ready_filter": {"max_off_high": 0.20, "min_1m": -0.10, "max_1m": 0.25, "min_3m": 0.20, "min_dollar_vol": 10000000, "adr_weight": 1.5},
+    "_health_help": "daily.py 形态健康度=数值(TV量能+Yahoo逐K) + 可选 Gemini 看图复核。vision_model: gemini-2.5-flash-lite(便宜稳) / gemini-3.1-pro-preview(更准更慢)。AI 看图需本地 secrets.json 的 gemini_api_key（或 GEMINI_API_KEY 环境变量）；无则只出数值。",
+    "health": {"base": 15, "prior": 65, "vol_good": -0.10, "vol_bad": 0.20, "atr_good": -0.05, "atr_bad": 0.15, "close_good": 0.55, "close_bad": 0.40, "dist_good": 1, "dist_bad": 4, "vision_model": "gemini-2.5-flash-lite"},
+    "_chart_help": "图表：有本地 tv_cookies.json 时截真·TradingView 登录图（用你自己的指标）；否则 mplfinance 自绘，均线按 chart_ma=[type ema/sma, length, color] 上色。",
+    "chart_ma": [["ema", 10, "#22D3EE"], ["ema", 21, "#22C55E"], ["sma", 50, "#EF4444"], ["sma", 200, "#9CA3AF"]],
     "output_dir": "~/qmag-scans"
   },
   "themes": {

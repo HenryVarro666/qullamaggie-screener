@@ -15,7 +15,7 @@ jobs:
           python-version: "3.12"
 
       - name: Python syntax (scanner)
-        run: python -m py_compile scanner/qmag_core.py scanner/theme_scan.py scanner/breakout_top10.py scanner/ready_top10.py scanner/charts.py
+        run: python -m py_compile scanner/qmag_core.py scanner/theme_scan.py scanner/breakout_top10.py scanner/ready_top10.py scanner/charts.py scanner/daily.py scanner/health.py
 
       - name: JSON config validity
         run: |

@@ -1,7 +1,8 @@
 # Scanner dependencies (scanner/ only — the skill itself needs nothing).
 requests>=2.31
 playwright>=1.40
-# playwright is used for: (a) the Deepvue backend, and (b) the TradingView daily-chart
-# screenshots embedded in reports (default ON). After install, download the browser once:
+mplfinance>=0.12        # fallback self-drawn charts (no TradingView login / CHART_MODE=mpl)
+# playwright is used for: (a) the Deepvue backend, and (b) real TradingView chart screenshots
+# (logged-in, with your OWN indicators — needs a local tv_cookies.json, git-ignored). After install:
 #   playwright install chromium
-# Don't want charts / no browser? Run with CHARTS=0 (TradingView scan backend needs no browser).
+# No TradingView login? charts auto-fall back to mplfinance self-draw. No charts at all? CHARTS=0.

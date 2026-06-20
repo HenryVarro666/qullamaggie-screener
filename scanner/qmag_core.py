@@ -50,7 +50,7 @@ def ready_key(m):  # 就绪度：离 52 周高越近 + 近月越紧 + ADR 越高
 
 # ---------- backend: TradingView (public scan endpoint, no login). wanted=None → whole US universe ----------
 def tv_fetch(wanted=None):
-    cols=["name","close","Perf.6M","Perf.3M","Perf.1M","Volatility.M","average_volume_30d_calc",
+    cols=["name","close","Perf.6M","Perf.3M","Perf.1M","Volatility.M","average_volume_30d_calc","average_volume_10d_calc","average_volume_90d_calc",
           "price_52_week_high","SMA50","SMA200","gap","relative_volume_10d_calc","earnings_release_date","sector","type","exchange",
           "earnings_per_share_diluted_yoy_growth_fq"]
     # no is_primary filter: US-listed ADRs (ASX, ALM…) have foreign primary listings and would be dropped
@@ -72,6 +72,7 @@ def tv_fetch(wanted=None):
               "p3":(n(d["Perf.3M"]) or 0)/100 if n(d["Perf.3M"]) is not None else None,
               "p1":(n(d["Perf.1M"]) or 0)/100 if n(d["Perf.1M"]) is not None else None,
               "dollar_vol":(av*last) if (av is not None and last is not None) else None,"sector":d["sector"] or "N/A",
+              "avg_vol_10d":n(d["average_volume_10d_calc"]),"avg_vol_90d":n(d["average_volume_90d_calc"]),
               "off_high":(last/hi-1) if (last and hi) else None,
               "above_50d":(last>s50) if (last and s50) else None,"above_200d":(last>s200) if (last and s200) else None,
               "ma50_gt_200":(s50>s200) if (s50 and s200) else None,
@@ -129,7 +130,7 @@ def deepvue_fetch(wanted=None):
         if not t: continue
         last=n(g(3)); hi=n(g(215)); pv50=n(g(284)); pv200=n(g(286))
         M[t]={"ticker":t,"last":last,"adr":n(g(1878)),"p6":n(g(278)),"p3":n(g(277)),"p1":n(g(2081)),
-              "dollar_vol":n(g(225)),"sector":g(20) or "N/A","off_high":(last/hi-1) if (last and hi) else None,
+              "dollar_vol":n(g(225)),"sector":g(20) or "N/A","avg_vol_10d":None,"avg_vol_90d":None,"off_high":(last/hi-1) if (last and hi) else None,
               "above_50d":(pv50>0) if pv50 is not None else None,"above_200d":(pv200>0) if pv200 is not None else None,
               "ma50_gt_200":(pv50<pv200) if (pv50 is not None and pv200 is not None) else None,  # 价离50d更近⟺50d>200d
               "gap":n(g(260)),"relvol":n(g(11)),"type":None,"exchange":None,"eps_growth":n(g(1576)),

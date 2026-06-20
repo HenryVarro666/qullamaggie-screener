@@ -1,6 +1,8 @@
 # ── Credentials & local state — NEVER commit ──
 cookies.json
 tokens.json
+tv_cookies.json
+secrets.json
 symbols2_map.json
 .deepvue/
 *.local.json

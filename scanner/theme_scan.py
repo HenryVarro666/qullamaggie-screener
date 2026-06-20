@@ -67,7 +67,7 @@ if unresolved:
     for k,vv in unresolved.items(): md.append(f"- **{k}**: {', '.join(vv)}")
 md.append(f"\n---\n*后端={BACKEND}；口径在 `themes.json` 调（backend/breakout_floors/ep_rules）。TV 后端免登录、数据为延迟/EOD、ADR≈Volatility.M。非投资建议。*")
 
-os.makedirs(OUTDIR, exist_ok=True); out_path=os.path.join(OUTDIR, f"{date_str}.md")
+os.makedirs(OUTDIR, exist_ok=True); out_path=os.path.join(OUTDIR, f"theme-{date_str}.md")
 with open(out_path,"w",encoding="utf-8") as f: f.write("\n".join(md))
 print(reg_lines[0].lstrip("> ").replace("**",""))
 print(f"后端 {BACKEND} ｜ 主题 {len(enabled)} ｜ 标的 {len(all_tickers)} ｜ 取到 {len(M)}")

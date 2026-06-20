@@ -33,7 +33,7 @@ Breakout/EP 标记、分析与一张 TradingView 日K图：
 | `skills/qullamaggie-swing-trading/` | The **Claude Code skill** — method, screening, entry/stop/exit, risk sizing, market-environment gating. Chinese. |
 | `skills/.../references/tradingview-screener.md` | **No-Deepvue TradingView fallback** — how to screen Breakout/EP in TradingView's built-in screener. |
 | `skills/.../assets/*.pine` | TradingView Pine: market-environment regime + a Breakout/EP flag-and-alert helper. |
-| `scanner/` | **Optional** auto-scanner (TradingView no-login, or Deepvue). Three tools — theme heatmap, *"buyable Top 10"*, and whole-market Breakout Top-N — each with per-stock analysis + an embedded TradingView daily chart. |
+| `scanner/` | **Optional** auto-scanner (TradingView no-login, or Deepvue). **`daily.py`** = one combined daily report (theme heatmap + *"buyable Top 10"* + whole-market Top-N), each hit with a daily chart + a **formation-health** read (accumulation vs distribution). |
 
 ---
 
@@ -53,21 +53,22 @@ Or use it as a plugin (the repo ships a `.claude-plugin/plugin.json`). Manual co
 reliable path.
 
 ### B. Auto-scanner — TradingView backend, **no login** (everyone) / 自动扫描（TradingView，免登录）
-Runs on **TradingView's public scan endpoint by default — no account, no token** — and writes daily
-reports with **Breakout ✓ / EP ⚡** flags, per-stock analysis, and an **embedded TradingView daily
-chart for every pick**. Three scanners (all share one strict core):
-- **`theme_scan.py`** — theme heatmap of the baskets you track.
-- **`ready_top10.py`** — *"buyable Top 10"*: Breakouts **coiling near the highs, ready to go** (not the
-  over-extended names a 6-month ranking floats to the top); whole-market + your themes in one report.
-- **`breakout_top10.py`** — whole-market Breakout Top-N.
+Runs on **TradingView's public scan endpoint by default — no account, no token**. **`daily.py`** writes
+**one** combined daily report: market regime → theme heatmap → *"buyable Top 10"* → whole-market Breakout
+Top-N, every hit with a **chart** + a **formation-health** read (healthy base vs distribution — numeric,
+plus optional Gemini chart-vision). Single-view scripts (`theme_scan` / `ready_top10` / `breakout_top10`)
+remain if you want just one slice.
 
-扫描器默认走 **TradingView 公开接口，无需登录/账号**；三个脚本 = 主题热力图 / 可买Top10 / 全市场Top，
-每只选出的票都内嵌一张 TradingView 日K图。
+> *Buyable Top 10* = Breakouts **coiling near the highs, ready to go** — not the over-extended names a
+> 6-month ranking floats to the top. Charts use **your own TradingView indicators** if you drop in a
+> (git-ignored) `tv_cookies.json`, else a mplfinance self-draw.
+
+扫描器默认走 **TradingView 公开接口，无需登录/账号**。`daily.py` 出**一份合并日报**（市场环境 → 主题热力图
+→ 可买Top10 → 全市场Top），每只带日K图 + 形态健康度。
 ```bash
-pip install -r requirements.txt
-playwright install chromium                             # for the embedded chart screenshots (or CHARTS=0 to skip)
+pip install -r requirements.txt                         # requests + playwright + mplfinance
 cp scanner/themes.example.json ~/.deepvue/themes.json   # backend already "tradingview"
-python3 scanner/ready_top10.py                          # or theme_scan.py / breakout_top10.py
+python3 scanner/daily.py                                # ⭐ one combined report (CHARTS=0 to skip charts)
 ```
 See **[`scanner/README.md`](scanner/README.md)**. (Prefer a manual workflow? The TradingView Stock
 Screener guide is in [`tradingview-screener.md`](skills/qullamaggie-swing-trading/references/tradingview-screener.md),
