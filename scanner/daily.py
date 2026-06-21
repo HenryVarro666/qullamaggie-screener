@@ -117,14 +117,14 @@ if unresolved:
     for k,vv in unresolved.items(): md.append(f"- **{k}**: {', '.join(vv)}")
 
 # —— ⚡ 可快速入手·精选（放文末作"今日结论"；阶段+形态+警示 打分，🟢第一梯队置顶）——
-_STAGE_SHORT={"较理想候选":"候选·等ORH","突破后期":"后期·别追","趋势延续":"趋势·持有"}
+# 注：精选取自可买清单（is_ready），阶段必为"候选·等ORH"无区分度 → 该列改用「就绪度」(ready_key)。
 picks=list({m["ticker"]:m for m in (mkt_ready+theme_ready)}.values())
 picks=sorted(picks, key=lambda m: quick_pick(m, True, is_ep(m), hm.get(m["ticker"]))[0], reverse=True)
 if picks:
     md.append("\n---\n## ⚡ 可快速入手 · 精选（今日结论）")
-    md.append("> 评分 = 阶段(较理想候选+3/趋势+1/后期−2) ＋ 数值形态(吸筹+2/派发−2) ＋ AI看图(🟢+1/🔴−1) − ⚠️数。**🟢第一梯队 = 挂 ORH 突破单首选**；🟡观察 = 形态未净，再等。仍须看图终判，非投资建议。")
-    md.append("\n| 梯队 | Tkr | 6M | 1M | 离高 | ADR | 阶段 | 形态 | 👁AI | ⚠️ | $Vol | 板块 |")
-    md.append("|--|--|--:|--:|--:|--:|--|:--:|:--:|:--:|--:|--|")
+    md.append("> 全部为「候选·等ORH」形态。评分 = 阶段(候选+3) ＋ 数值形态(吸筹+2/派发−2) ＋ AI看图(🟢+1/🔴−1) − ⚠️数 → **🟢第一梯队=挂 ORH 突破单首选**；🟡观察=形态未净再等。**就绪度** = 离高 − |近月| + ADR×权重，越高越贴高越紧、越快突破。仍须看图终判，非投资建议。")
+    md.append("\n| 梯队 | Tkr | 6M | 1M | 离高 | ADR | 就绪度 | 形态 | 👁AI | ⚠️ | $Vol | 板块 |")
+    md.append("|--|--|--:|--:|--:|--:|--:|:--:|:--:|:--:|--:|--|")
     for m in picks:
         s,stage,tier=quick_pick(m, True, is_ep(m), hm.get(m["ticker"]))
         h=hm.get(m["ticker"],{}) or {}; num=h.get("verdict","")
@@ -132,7 +132,7 @@ if picks:
         ai=(h.get("vision") or {}).get("emoji","—") or "—"
         warns="；".join(stage_note(m, True, is_ep(m))).count("⚠️")
         plate="/".join(idx_themes[m["ticker"]]) if m["ticker"] in theme_set else m["sector"]
-        md.append(f"| {tier} | **{m['ticker']}** | {pct(m['p6'])} | {pct(m['p1'])} | {pct(m['off_high'])} | {fadr(m['adr'])} | {_STAGE_SHORT.get(stage,stage)} | {ne} | {ai} | {warns} | {fvol(m['dollar_vol'])} | {plate} |")
+        md.append(f"| {tier} | **{m['ticker']}** | {pct(m['p6'])} | {pct(m['p1'])} | {pct(m['off_high'])} | {fadr(m['adr'])} | {ready_key(m)*100:+.0f} | {ne} | {ai} | {warns} | {fvol(m['dollar_vol'])} | {plate} |")
 
 md.append(f"\n---\n*后端={BACKEND}；图=TradingView widget 截图；形态=TV量能+Yahoo逐K+可选AI看图（延迟/EOD）。✓/⚡/⭐与形态均为数值/AI辅助，非投资建议。*")
 
