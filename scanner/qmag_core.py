@@ -14,7 +14,7 @@ floors={"price":1,"adr":0.03,"perf6M":0.20,"dollarVol20d":1_000_000,"perf3M_min"
 ep={"gap_pct":0.10,"rel_vol":1.5,"perf6M_cap":1.0,"min_dollar_vol":floors["dollarVol20d"],
     "require_earnings":True,"max_days_since_earnings":5,"min_eps_growth_pct":25, **meta.get("ep_rules",{})}
 # "就绪/可买"门槛：在 Breakout 命中里再筛"贴52周高 + 近月整理 + 仍强"的可立即出手形态（ready_top10.py 用）
-ready={"max_off_high":0.20,"min_1m":-0.10,"max_1m":0.25,"min_3m":0.20,"min_dollar_vol":10_000_000,"adr_weight":1.5, **meta.get("ready_filter",{})}
+ready={"max_off_high":0.20,"min_1m":-0.10,"max_1m":0.25,"min_3m":0.20,"min_dollar_vol":5_000_000,"adr_weight":1.5, **meta.get("ready_filter",{})}
 OUTDIR=os.path.expanduser(meta.get("output_dir", os.path.join(HOME,"scans")))
 NOW=time.time()
 UA={"user-agent":"Mozilla/5.0"}
@@ -171,20 +171,9 @@ def frv(x): return f"{x:.1f}x" if isinstance(x,(int,float)) else "–"
 def st2(m): return "✓" if (m.get("above_50d") and m.get("above_200d") and m.get("ma50_gt_200")) else ("50" if m.get("above_50d") else "—")
 def tv_symbol(m): return f"{m['exchange']}:{m['ticker']}" if m.get("exchange") else m["ticker"]  # TradingView 图表用 EXCHANGE:TICKER
 
-# ---------- 逐只详细分析（theme_scan / ready_top10 共用；themes 为空时表头只显示 sector）----------
-def analysis(m, themes, fb, fe):
-    setup="Breakout＋EP" if (fb and fe) else ("Breakout" if fb else "EP")
-    p6,p3,p1,adr,gap,rv,dv,oh=m["p6"],m["p3"],m["p1"],m["adr"],m["gap"],m["relvol"],m["dollar_vol"],m["off_high"]
-    eg,dse=m.get("eps_growth"),m.get("days_since_earn")
-    # —— 选中理由（逐条对应过的门槛）——
-    why=[f"6M {pct(p6)}·3M {pct(p3)}·1M {pct(p1)}（{'三周期共振、当下领涨' if (isinstance(p3,(int,float)) and p3>0.2) else '半年维度领涨'}）"]
-    if fb:
-        why.append("站稳 50/200 日线且 50>200 → **Stage 2 多头排列**")
-        why.append(f"离52周高 {pct(oh)} → {'贴着高点蓄势（不是暴涨后的残骸）' if (isinstance(oh,(int,float)) and oh>-0.10) else '仍在 25% 阈值内、偏离 base'}")
-    why.append(f"ADR {fadr(adr)}（爆发力够）·20日均额 {fvol(dv)}（流动性）")
-    if fe:
-        why.append(f"今日 Gap {pct1(gap)}·放量 {frv(rv)}" + (f"·EPS同比 {eg:+.0f}%·距财报 {dse:.0f}d → **财报型 EP**" if isinstance(eg,(int,float)) and isinstance(dse,(int,float)) else " → EP"))
-    # —— 阶段判断 + 该股专属注意点 ——
+def stage_note(m, fb, fe):
+    # 阶段与注意：该等 / 该买 / 该避 的判断 + ⚠️ 专属提示（analysis() 与全市场突破榜画廊共用一份逻辑）
+    p1,p3,p6,adr,dv,oh=m["p1"],m["p3"],m["p6"],m["adr"],m["dollar_vol"],m["off_high"]; dse=m.get("days_since_earn")
     note=[]
     if fb:
         if (isinstance(p1,(int,float)) and p1>0.5) or (isinstance(p6,(int,float)) and p6>5):
@@ -200,6 +189,36 @@ def analysis(m, themes, fb, fe):
     if isinstance(oh,(int,float)) and oh<-0.18: note.append(f"⚠️ 已离高 {pct(oh)} → 偏离 base，确认是回踩而非破位再动")
     if isinstance(p1,(int,float)) and p1<-0.05 and fb: note.append(f"⚠️ 近1月 {pct(p1)} 在回调 → 等企稳重新站上短均线再考虑")
     if fe and isinstance(dse,(int,float)) and dse<=5: note.append("⚠️ 紧贴财报 → 注意财报后的二次波动/回吐")
+    return note
+
+def quick_pick(m, fb, fe, health=None):
+    """可快速入手打分：阶段(较理想候选+3/趋势+1/后期−2) ＋ 数值形态(吸筹+2/派发−2) ＋ AI(🟢+1/🔴−1) − ⚠️数。
+    health=health_for 的单只 dict（可空）。返回 (score, stage_label, tier)。"""
+    nt="；".join(stage_note(m, fb, fe))
+    stage="较理想候选" if "较理想" in nt else ("突破后期" if "突破后期" in nt else "趋势延续")
+    warns=nt.count("⚠️")
+    h=health or {}; num=h.get("verdict",""); ai=(h.get("vision") or {}).get("emoji","")
+    s =(3 if "候选" in stage else 1 if "趋势" in stage else -2)
+    s+=(2 if "吸筹" in num else -2 if "派发" in num else 0)
+    s+=(1 if ai=="🟢" else -1 if ai=="🔴" else 0)
+    s-=warns
+    tier="🟢 第一梯队" if s>=5 else ("🟢 较好" if s>=3 else "🟡 观察")
+    return s, stage, tier
+
+# ---------- 逐只详细分析（theme_scan / ready_top10 共用；themes 为空时表头只显示 sector）----------
+def analysis(m, themes, fb, fe):
+    setup="Breakout＋EP" if (fb and fe) else ("Breakout" if fb else "EP")
+    p6,p3,p1,adr,gap,rv,dv,oh=m["p6"],m["p3"],m["p1"],m["adr"],m["gap"],m["relvol"],m["dollar_vol"],m["off_high"]
+    eg,dse=m.get("eps_growth"),m.get("days_since_earn")
+    # —— 选中理由（逐条对应过的门槛）——
+    why=[f"6M {pct(p6)}·3M {pct(p3)}·1M {pct(p1)}（{'三周期共振、当下领涨' if (isinstance(p3,(int,float)) and p3>0.2) else '半年维度领涨'}）"]
+    if fb:
+        why.append("站稳 50/200 日线且 50>200 → **Stage 2 多头排列**")
+        why.append(f"离52周高 {pct(oh)} → {'贴着高点蓄势（不是暴涨后的残骸）' if (isinstance(oh,(int,float)) and oh>-0.10) else '仍在 25% 阈值内、偏离 base'}")
+    why.append(f"ADR {fadr(adr)}（爆发力够）·20日均额 {fvol(dv)}（流动性）")
+    if fe:
+        why.append(f"今日 Gap {pct1(gap)}·放量 {frv(rv)}" + (f"·EPS同比 {eg:+.0f}%·距财报 {dse:.0f}d → **财报型 EP**" if isinstance(eg,(int,float)) and isinstance(dse,(int,float)) else " → EP"))
+    note=stage_note(m, fb, fe)   # 阶段与注意（与全市场突破榜画廊共用）
     parts=[setup]+(['/'.join(themes)] if themes else [])+[m['sector']]
     return "\n".join([
         f"- **{m['ticker']}**（{'｜'.join(parts)}）",

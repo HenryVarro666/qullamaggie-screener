@@ -28,7 +28,8 @@ whole=[m for m in M.values() if is_breakout(m) and (m.get("type") in ("stock","d
 whole.sort(key=lambda m:(m["p6"] if m["p6"] is not None else -9), reverse=True); whole=whole[:N]
 theme_hits=[t for t in theme_set if t in M and (flags[t][0] or flags[t][1])]
 
-date_str=datetime.datetime.now().strftime("%Y-%m-%d"); run_ts=datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+date_str=os.environ.get("REPORT_DATE") or datetime.datetime.now().strftime("%Y-%m-%d")   # REPORT_DATE 覆盖：改码后用当天缓存重生成旧报告，不重抓
+run_ts=datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 show={}
 for t in theme_hits: show[t]=M[t]
 for m in (mkt_ready+theme_ready+whole): show[m["ticker"]]=m
@@ -52,7 +53,7 @@ md+=reg
 # —— 目录 ——
 md.append("\n## 目录")
 md.append("- 板块（主题热力图）：" + " · ".join(f"[{k}](#{k})" for k in enabled))
-md.append("- [可买清单](#可买清单)　|　[全市场突破榜](#全市场突破榜)")
+md.append("- [可买清单](#可买清单)　|　[全市场突破榜](#全市场突破榜)　|　**[⚡ 可快速入手·精选（今日结论）](#-可快速入手--精选今日结论)**")
 md.append("> 标记：**✓**Breakout **⚡**EP **⭐**可买。**形态**：🟢吸筹收紧 / 🟡中性 / 🔴派发疑虑（数值=TV量能+Yahoo逐K；👁AI=看图复核）。数值与 AI 皆**辅助**，关键仓位仍自己看图。\n")
 
 # —— 主题热力图（在前）——
@@ -79,7 +80,7 @@ for name in enabled:
 
 # —— 可买清单 ——
 md.append("\n## 可买清单")
-md.append("> Breakout 命中里再筛'就绪/可买'（贴52周高+近月整理+流动性），按就绪度排序。**先看形态行**确认是吸筹收紧而非派发。")
+md.append("> Breakout 命中里再筛'就绪/可买'（贴52周高+近月整理+流动性），按就绪度排序。**先看形态行**确认是吸筹收紧而非派发。**今日'可快速入手'结论见文末精选表。**")
 def ready_block(title, rows):
     md.append(f"\n### {title}（{len(rows)}）")
     if not rows: md.append("_今日无_"); return
@@ -106,12 +107,33 @@ for i,m in enumerate(whole,1):
     t=m["ticker"]; rel=cm.get(t)
     md.append(f"\n**{i}. {t}**　{pct(m['p6'])} 6M · ADR {fadr(m['adr'])} · 离高 {pct(m['off_high'])}")
     md.append(f"![{t} 日K]({rel})" if rel else "_(图未生成)_")
+    nt=stage_note(m, True, is_ep(m))
+    if nt: md.append("- **阶段与注意**：" + "；".join(nt) + "。")
     hl=health_line(hm.get(t))
     if hl: md.append(hl.lstrip())
 
 if unresolved:
     md.append("\n---\n## ⚠️ 未取到数据的 ticker（退市/非美股/拼写）")
     for k,vv in unresolved.items(): md.append(f"- **{k}**: {', '.join(vv)}")
+
+# —— ⚡ 可快速入手·精选（放文末作"今日结论"；阶段+形态+警示 打分，🟢第一梯队置顶）——
+_STAGE_SHORT={"较理想候选":"候选·等ORH","突破后期":"后期·别追","趋势延续":"趋势·持有"}
+picks=list({m["ticker"]:m for m in (mkt_ready+theme_ready)}.values())
+picks=sorted(picks, key=lambda m: quick_pick(m, True, is_ep(m), hm.get(m["ticker"]))[0], reverse=True)
+if picks:
+    md.append("\n---\n## ⚡ 可快速入手 · 精选（今日结论）")
+    md.append("> 评分 = 阶段(较理想候选+3/趋势+1/后期−2) ＋ 数值形态(吸筹+2/派发−2) ＋ AI看图(🟢+1/🔴−1) − ⚠️数。**🟢第一梯队 = 挂 ORH 突破单首选**；🟡观察 = 形态未净，再等。仍须看图终判，非投资建议。")
+    md.append("\n| 梯队 | Tkr | 6M | 1M | 离高 | ADR | 阶段 | 形态 | 👁AI | ⚠️ | $Vol | 板块 |")
+    md.append("|--|--|--:|--:|--:|--:|--|:--:|:--:|:--:|--:|--|")
+    for m in picks:
+        s,stage,tier=quick_pick(m, True, is_ep(m), hm.get(m["ticker"]))
+        h=hm.get(m["ticker"],{}) or {}; num=h.get("verdict","")
+        ne="🟢" if "吸筹" in num else ("🔴" if "派发" in num else "🟡")
+        ai=(h.get("vision") or {}).get("emoji","—") or "—"
+        warns="；".join(stage_note(m, True, is_ep(m))).count("⚠️")
+        plate="/".join(idx_themes[m["ticker"]]) if m["ticker"] in theme_set else m["sector"]
+        md.append(f"| {tier} | **{m['ticker']}** | {pct(m['p6'])} | {pct(m['p1'])} | {pct(m['off_high'])} | {fadr(m['adr'])} | {_STAGE_SHORT.get(stage,stage)} | {ne} | {ai} | {warns} | {fvol(m['dollar_vol'])} | {plate} |")
+
 md.append(f"\n---\n*后端={BACKEND}；图=TradingView widget 截图；形态=TV量能+Yahoo逐K+可选AI看图（延迟/EOD）。✓/⚡/⭐与形态均为数值/AI辅助，非投资建议。*")
 
 os.makedirs(OUTDIR, exist_ok=True); out_path=os.path.join(OUTDIR, f"{date_str}.md")

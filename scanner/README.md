@@ -99,7 +99,8 @@ GitHub; each ticker drawn once per day and reused):
   **recent earnings (≤5 trading days) + strong EPS YoY growth (≥25%)**. Set
   `ep_rules.require_earnings:false` to also include non-earnings catalysts (FDA / regulatory / macro).
 - **Ready / buyable ⭐** (`ready_top10` / `daily.py`): a Breakout hit **within ~20% of its 52-week
-  high**, **last-month perf in −10%…+25%** (consolidating, not blown off), **≥ $10M/day** liquidity.
+  high**, **last-month perf in −10%…+25%** (consolidating, not blown off), **≥ $5M/day** liquidity
+  (a universal "real names" gate — not tied to your account size; quality comes from ADR/Stage2/base).
   Ranked by **readiness = `off_high − |1M perf| + ADR × 1.5`** (*high ADR is gold*). Knobs in `_meta.ready_filter`.
 
 > **Note — stricter than Qullamaggie's original Deepvue screener.** Those screenshots hard-filter only

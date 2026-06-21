@@ -31,6 +31,8 @@ if any(cm.get(m["ticker"]) for m in top):
         rel=cm.get(m["ticker"])
         md.append(f"\n**{i}. {m['ticker']}**　{pct(m['p6'])} 6M · ADR {fadr(m['adr'])} · 离高 {pct(m['off_high'])}")
         md.append(f"![{m['ticker']} 日K]({rel})" if rel else "_(图未生成)_")
+        nt=stage_note(m, True, is_ep(m))
+        if nt: md.append("- **阶段与注意**：" + "；".join(nt) + "。")
 
 os.makedirs(OUTDIR, exist_ok=True); out_path=os.path.join(OUTDIR, f"breakout-top{N}-{date_str}.md")
 with open(out_path,"w",encoding="utf-8") as f: f.write("\n".join(md))
