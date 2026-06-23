@@ -118,18 +118,20 @@ if unresolved:
 # 注：精选取自可买清单（is_ready），阶段必为"候选·等ORH"无区分度 → 该列改用「就绪度」(ready_key)。
 picks=list({m["ticker"]:m for m in (mkt_ready+theme_ready)}.values())
 picks=sorted(picks, key=lambda m: quick_pick(m, True, flags[m["ticker"]][1], hm.get(m["ticker"]))[0], reverse=True)
+streaks=pick_streaks(date_str, [m["ticker"] for m in picks])        # 连续在榜天数（耐久 setup vs 当天闪现）
 if picks:
     md.append("\n---\n## ⚡ 可快速入手 · 精选（今日结论）")
-    md.append("> 全部为「候选·等ORH」形态。评分 = 阶段(候选+3) ＋ 数值形态(吸筹+2/派发−2) ＋ AI看图(🟢+1/🔴−1) − ⚠️数 → **🟢第一梯队=挂 ORH 突破单首选**；🟡观察=形态未净再等。**就绪度** = 离高 − |近月| + ADR×权重，越高越贴高越紧、越快突破。仍须看图终判，非投资建议。")
-    md.append("\n| 梯队 | Tkr | 6M | 1M | 离高 | ADR | 就绪度 | 形态 | 👁AI | ⚠️ | $Vol | 板块 |")
-    md.append("|--|--|--:|--:|--:|--:|--:|:--:|:--:|:--:|--:|--|")
+    md.append("> 全部为「候选·等ORH」形态。评分 = 阶段(候选+3) ＋ 数值形态(吸筹+2/派发−2) ＋ AI看图(🟢+1/🔴−1) − ⚠️数 → **🟢第一梯队=挂 ORH 突破单首选**；🟡观察=形态未净再等。**就绪度** = 离高 − |近月| + ADR×权重，越高越贴高越紧、越快突破。**在榜** = 连续上榜报告日数，**📌≥3天=耐久 setup 更稳**、1天=当天闪现需谨慎。仍须看图终判，非投资建议。")
+    md.append("\n| 梯队 | Tkr | 在榜 | 6M | 1M | 离高 | ADR | 就绪度 | 形态 | 👁AI | ⚠️ | $Vol | 板块 |")
+    md.append("|--|--|:--:|--:|--:|--:|--:|--:|:--:|:--:|:--:|--:|--|")
     for m in picks:
         t=m["ticker"]; fe=flags[t][1]; h=hm.get(t,{}) or {}
         tier=quick_pick(m, True, fe, h)[2]
         ne=health_emoji(h); ai=(h.get("vision") or {}).get("emoji","—") or "—"
         warns="；".join(stage_note(m, True, fe)).count("⚠️")
         plate="/".join(idx_themes[t]) if t in theme_set else m["sector"]
-        md.append(f"| {tier} | **{t}** | {pct(m['p6'])} | {pct(m['p1'])} | {pct(m['off_high'])} | {fadr(m['adr'])} | {fmt_ready(m)} | {ne} | {ai} | {warns} | {fvol(m['dollar_vol'])} | {plate} |")
+        s=streaks.get(t,1); stk=("📌" if s>=3 else "")+f"{s}天"
+        md.append(f"| {tier} | **{t}** | {stk} | {pct(m['p6'])} | {pct(m['p1'])} | {pct(m['off_high'])} | {fadr(m['adr'])} | {fmt_ready(m)} | {ne} | {ai} | {warns} | {fvol(m['dollar_vol'])} | {plate} |")
 
 md.append(f"\n---\n*后端={BACKEND}；图=真·TradingView登录截图（或 mplfinance 自绘）；形态=TV量能+Yahoo逐K+可选AI看图（延迟/EOD）。✓/⚡/⭐与形态均为数值/AI辅助，非投资建议。*")
 
