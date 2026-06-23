@@ -7,7 +7,12 @@ import json, requests, os, sys, time
 HOME=os.environ.get("DEEPVUE_DIR", os.path.expanduser("~/.deepvue"))
 def rd_json(p):
     with open(p, encoding="utf-8") as f: return json.load(f)
-cfg=rd_json(f"{HOME}/themes.json"); meta=cfg["_meta"]
+try:
+    cfg=rd_json(f"{HOME}/themes.json"); meta=cfg["_meta"]
+except FileNotFoundError:
+    sys.exit(f"❌ 找不到配置 {HOME}/themes.json（复制 themes.example.json 过去）。")
+except (json.JSONDecodeError, KeyError) as e:
+    sys.exit(f"❌ {HOME}/themes.json 解析失败或缺 '_meta'：{e}")
 BACKEND=os.environ.get("SCAN_BACKEND", meta.get("backend","tradingview")).lower()  # SCAN_BACKEND env overrides config
 floors={"price":1,"adr":0.03,"perf6M":0.20,"dollarVol20d":1_000_000,"perf3M_min":0.05,"perf1M_min":-0.20,
         "max_off_high":0.25,"require_stage2":True,"require_ma_stack":True, **meta.get("breakout_floors",{})}
@@ -21,8 +26,8 @@ UA={"user-agent":"Mozilla/5.0"}
 
 # ---------- strict predicates (operate on a normalized metrics dict) ----------
 def is_breakout(m):
-    if any(m.get(k) is None for k in ("last","adr","p6","p3","p1","dollar_vol")): return False
-    if m["off_high"] is not None and m["off_high"] < -floors["max_off_high"]: return False
+    if any(m.get(k) is None for k in ("last","adr","p6","p3","p1","dollar_vol","off_high")): return False  # off_high 必需：离52周高≤25% 是硬规则
+    if m["off_high"] < -floors["max_off_high"]: return False
     if floors["require_stage2"] and not (m["above_50d"] and m["above_200d"]): return False   # 周线 Stage 2: 站上 50/200 日线
     if floors["require_ma_stack"] and not m["ma50_gt_200"]: return False                      # 多头排列 50>200
     return (m["last"]>=floors["price"] and m["adr"]>=floors["adr"] and m["p6"]>=floors["perf6M"]
@@ -47,6 +52,15 @@ def is_ready(m):
             and p3>=ready["min_3m"] and m["dollar_vol"]>=ready["min_dollar_vol"])
 def ready_key(m):  # 就绪度：离 52 周高越近 + 近月越紧 + ADR 越高(high ADR is gold) → 分越高（降序排前）
     return (m["off_high"]-abs(m["p1"])+m["adr"]*ready["adr_weight"])
+def fmt_ready(m): return f"{ready_key(m)*100:+.0f}"                  # 就绪度展示串（ready_top10/daily 共用）
+def is_equity(m): return m.get("type") in ("stock","dr") or m.get("type") is None  # 个股(含ADR)，排除杠杆ETF/ETN
+def load_themes():                                                  # 主题解析+反查（四脚本共用，免重复粘贴）
+    enabled={k:v for k,v in cfg["themes"].items() if v.get("enabled")}
+    theme_tickers={k:list(dict.fromkeys(v["tickers"])) for k,v in enabled.items()}
+    idx_themes={}
+    for k,ts in theme_tickers.items():
+        for t in ts: idx_themes.setdefault(t,[]).append(k)
+    return enabled, theme_tickers, idx_themes, set(idx_themes)
 
 # ---------- backend: TradingView (public scan endpoint, no login). wanted=None → whole US universe ----------
 def tv_fetch(wanted=None):
@@ -58,11 +72,18 @@ def tv_fetch(wanted=None):
                        {"left":"exchange","operation":"in_range","right":["NASDAQ","NYSE","AMEX"]}],
              "symbols":{"query":{"types":["stock","dr","fund"]},"tickers":[]},
              "columns":cols,"sort":{"sortBy":"Perf.6M","sortOrder":"desc"},"range":[0,30000]}
-    r=requests.post("https://scanner.tradingview.com/america/scan",
-                    headers={**UA,"content-type":"application/json"}, json=payload, timeout=40)
-    r.raise_for_status()
+    last_err=None; data=None
+    for attempt in range(3):                                   # 公开接口偶发网络/限流 → 退避重试，失败给清晰提示而非 traceback
+        try:
+            r=requests.post("https://scanner.tradingview.com/america/scan",
+                            headers={**UA,"content-type":"application/json"}, json=payload, timeout=40)
+            r.raise_for_status(); data=r.json(); break
+        except (requests.RequestException, ValueError) as e:
+            last_err=e; time.sleep(1.5*(attempt+1))
+    if data is None:
+        sys.exit(f"❌ TradingView 扫描失败（网络/限流？重试 3 次未果）：{repr(last_err)[:120]}")
     M={}; n=lambda x: x if isinstance(x,(int,float)) else None
-    for row in r.json().get("data",[]):
+    for row in data.get("data",[]):
         d=dict(zip(cols,row["d"])); t=d["name"]
         if wanted and t not in wanted: continue
         last=n(d["close"]); hi=n(d["price_52_week_high"]); s50=n(d["SMA50"]); s200=n(d["SMA200"])
@@ -84,7 +105,10 @@ def tv_fetch(wanted=None):
 
 # ---------- backend: Deepvue (own paid account, WS). wanted=None → whole market (all symbols) ----------
 def deepvue_fetch(wanted=None):
-    from playwright.sync_api import sync_playwright
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        sys.exit("❌ Deepvue 后端需 playwright：pip install playwright && playwright install chromium（或 themes.json 改 backend=tradingview）")
     API="https://api.deepvue.com"; LS="https://lightserver.deepvue.com"; DUA={**UA,"origin":"https://app.deepvue.com"}
     tok=rd_json(f"{HOME}/tokens.json")
     try:
@@ -101,8 +125,11 @@ def deepvue_fetch(wanted=None):
     mp_path=f"{HOME}/symbols2_map.json"
     if os.path.exists(mp_path): tkr2idx={k:int(v) for k,v in rd_json(mp_path)["tkr2idx"].items()}
     else:
-        durls=requests.get(f"{LS}/v1.0/definition-urls",headers=H,timeout=20).json()
-        sym=requests.get(durls["symbols2"],headers=DUA,timeout=40).json(); tkr2idx={r[1]:r[0] for r in sym}
+        try:
+            durls=requests.get(f"{LS}/v1.0/definition-urls",headers=H,timeout=20).json()
+            sym=requests.get(durls["symbols2"],headers=DUA,timeout=40).json(); tkr2idx={r[1]:r[0] for r in sym}
+        except (requests.RequestException, ValueError, KeyError) as e:
+            sys.exit(f"❌ Deepvue 符号表下载失败：{repr(e)[:100]}")
         with open(mp_path,"w",encoding="utf-8") as f: json.dump({"idx2tkr":{r[0]:r[1] for r in sym},"tkr2idx":tkr2idx},f)
     if wanted is None: wanted=set(tkr2idx.keys())                          # whole market
     idxs=[tkr2idx[t] for t in wanted if t in tkr2idx]; idx2tkr={tkr2idx[t]:t for t in wanted if t in tkr2idx}
@@ -118,10 +145,13 @@ def deepvue_fetch(wanted=None):
         return out
     init=f"localStorage.setItem('accessToken',{json.dumps(at)});localStorage.setItem('refreshToken',{json.dumps(tok['refreshToken'])});localStorage.setItem('deviceId',{json.dumps(tok['deviceId'])});localStorage.setItem('deepvue-chart-device-id',{json.dumps(tok['chartDeviceId'])});localStorage.setItem('theme','dark-mode');localStorage.setItem('i18nextLng','en');"
     js=r"""async ([cols,idxs,token,deviceId])=>{const J=o=>JSON.stringify(o);const sid='sid-'+Math.random().toString(36).slice(2)+Date.now().toString(36);const proto=`${sid}***${token}***${deviceId}`;const sleep=ms=>new Promise(r=>setTimeout(r,ms));const CH=300;return await new Promise(res=>{const ws=new WebSocket('wss://lightserver.deepvue.com/ws-data',[proto]);let by={},started=false;const fin=()=>{try{ws.close()}catch(e){};res({rows:Object.values(by)})};let hard=setTimeout(fin,60000);ws.onmessage=async ev=>{let m;try{m=JSON.parse(ev.data)}catch(e){return;}if(m.event==='Connect.Authorized'&&!started){started=true;for(let i=0;i<idxs.length;i+=CH){const part=idxs.slice(i,i+CH);ws.send(J({event:'Screener.Subscribe',data:{messageId:Math.floor(Math.random()*1e6),filters:[[[0,0,part]]],columns:cols,range:[0,part.length],sortBy:[],symbolIndex:0}}));await sleep(150);}let last=-1,stable=0;for(let k=0;k<80;k++){await sleep(450);const nn=Object.keys(by).length;if(nn>=idxs.length)break;if(nn===last){stable++;if(stable>=6)break;}else{stable=0;last=nn;}}clearTimeout(hard);fin();}else if((m.event==='Screener.Subscribe'||m.event==='Screener.Patch')&&Array.isArray(m.data&&m.data.data)){for(const r of m.data.data)if(Array.isArray(r))by[r[0]]=r;}};ws.onerror=()=>{clearTimeout(hard);fin()};});}"""
-    with sync_playwright() as p:
-        b=p.chromium.launch(headless=True); ctx=b.new_context(); ctx.add_cookies(load_cookies(f"{HOME}/cookies.json")); ctx.add_init_script(init)
-        pg=ctx.new_page(); pg.goto("https://app.deepvue.com/?p=screener",wait_until="domcontentloaded",timeout=45000); pg.wait_for_timeout(3500)
-        res=pg.evaluate(js,[C,idxs,at,tok["deviceId"]]); b.close()
+    try:
+        with sync_playwright() as p:
+            b=p.chromium.launch(headless=True); ctx=b.new_context(); ctx.add_cookies(load_cookies(f"{HOME}/cookies.json")); ctx.add_init_script(init)
+            pg=ctx.new_page(); pg.goto("https://app.deepvue.com/?p=screener",wait_until="domcontentloaded",timeout=45000); pg.wait_for_timeout(3500)
+            res=pg.evaluate(js,[C,idxs,at,tok["deviceId"]]); b.close()
+    except Exception as e:
+        sys.exit(f"❌ Deepvue 抓取失败（Chromium 未装→playwright install chromium；或 WS/网络问题）：{repr(e)[:100]}")
     ci={c:i for i,c in enumerate(C)}; n=lambda x: x if isinstance(x,(int,float)) else None
     M={}
     for row in res["rows"]:
@@ -135,6 +165,14 @@ def deepvue_fetch(wanted=None):
               "ma50_gt_200":(pv50<pv200) if (pv50 is not None and pv200 is not None) else None,  # 价离50d更近⟺50d>200d
               "gap":n(g(260)),"relvol":n(g(11)),"type":None,"exchange":None,"eps_growth":n(g(1576)),
               "days_since_earn":((NOW-n(g(137)))/86400.0) if n(g(137)) else None}
+    # 防御性归一：谓词按小数口径写（tv_fetch 已 /100）。若 Deepvue 列是百分数(ADR 中位>1)，统一 /100 对齐；
+    # 否则(本就是小数)不动。eps_growth 两后端都是百分数(阈值 25)，不归一。自检尺度，避免切后端时谓词错位。
+    adrs=[m["adr"] for m in M.values() if isinstance(m["adr"],(int,float))]
+    if adrs and sum(1 for a in adrs if a>1) > len(adrs)*0.5:
+        sys.stderr.write("ℹ️ Deepvue 列疑为百分数 → 已 /100 归一到小数口径。\n")
+        for m in M.values():
+            for k in ("adr","p6","p3","p1","gap"):
+                if isinstance(m.get(k),(int,float)): m[k]=m[k]/100.0
     return M
 
 def fetch(wanted=None): return (tv_fetch if BACKEND=="tradingview" else deepvue_fetch)(wanted)
@@ -171,14 +209,22 @@ def frv(x): return f"{x:.1f}x" if isinstance(x,(int,float)) else "–"
 def st2(m): return "✓" if (m.get("above_50d") and m.get("above_200d") and m.get("ma50_gt_200")) else ("50" if m.get("above_50d") else "—")
 def tv_symbol(m): return f"{m['exchange']}:{m['ticker']}" if m.get("exchange") else m["ticker"]  # TradingView 图表用 EXCHANGE:TICKER
 
+def _stage_of(m, fb, fe):
+    # 阶段分类（candidate/late/trend/ep/none）——stage_note 出文案、quick_pick 算分，共用此判定，免得各自抠中文串
+    if not fb: return "ep" if fe else "none"
+    p1=m.get("p1"); p6=m.get("p6"); p3=m.get("p3")
+    if (isinstance(p1,(int,float)) and p1>0.5) or (isinstance(p6,(int,float)) and p6>5): return "late"
+    if isinstance(p1,(int,float)) and -0.12<=p1<=0.25 and (p3 or 0)>=ready["min_3m"]: return "candidate"  # 与 is_ready p3 门槛对齐
+    return "trend"
+
 def stage_note(m, fb, fe):
     # 阶段与注意：该等 / 该买 / 该避 的判断 + ⚠️ 专属提示（analysis() 与全市场突破榜画廊共用一份逻辑）
-    p1,p3,p6,adr,dv,oh=m["p1"],m["p3"],m["p6"],m["adr"],m["dollar_vol"],m["off_high"]; dse=m.get("days_since_earn")
-    note=[]
+    p1,adr,dv,oh=m["p1"],m["adr"],m["dollar_vol"],m["off_high"]; dse=m.get("days_since_earn")
+    st=_stage_of(m, fb, fe); note=[]
     if fb:
-        if (isinstance(p1,(int,float)) and p1>0.5) or (isinstance(p6,(int,float)) and p6>5):
+        if st=="late":
             note.append("**已大幅延伸/偏抛物线（突破后期）**——别追高，现价进盈亏比差，等它回调收紧成新 base 再在 ORH 进")
-        elif isinstance(p1,(int,float)) and -0.12<=p1<=0.25 and (p3 or 0)>0.2:
+        elif st=="candidate":
             note.append("**强势 + 近月在整理（较理想的 breakout 候选）**——等放量突破开盘区间高点(ORH)进")
         else:
             note.append("站上均线、趋势延续——跟随趋势，回调不破位即持有")
@@ -194,12 +240,14 @@ def stage_note(m, fb, fe):
 def quick_pick(m, fb, fe, health=None):
     """可快速入手打分：阶段(较理想候选+3/趋势+1/后期−2) ＋ 数值形态(吸筹+2/派发−2) ＋ AI(🟢+1/🔴−1) − ⚠️数。
     health=health_for 的单只 dict（可空）。返回 (score, stage_label, tier)。"""
-    nt="；".join(stage_note(m, fb, fe))
-    stage="较理想候选" if "较理想" in nt else ("突破后期" if "突破后期" in nt else "趋势延续")
-    warns=nt.count("⚠️")
-    h=health or {}; num=h.get("verdict",""); ai=(h.get("vision") or {}).get("emoji","")
-    s =(3 if "候选" in stage else 1 if "趋势" in stage else -2)
-    s+=(2 if "吸筹" in num else -2 if "派发" in num else 0)
+    st=_stage_of(m, fb, fe)
+    stage={"candidate":"较理想候选","late":"突破后期"}.get(st,"趋势延续")
+    warns="；".join(stage_note(m, fb, fe)).count("⚠️")
+    h=health or {}
+    he=h.get("emoji") or ("🟢" if "吸筹" in h.get("verdict","") else "🔴" if "派发" in h.get("verdict","") else "🟡")
+    ai=(h.get("vision") or {}).get("emoji","")
+    s =(3 if st=="candidate" else -2 if st=="late" else 1)   # 候选+3 / 后期−2 / 其余(趋势·EP)+1（与旧版一致）
+    s+=(2 if he=="🟢" else -2 if he=="🔴" else 0)
     s+=(1 if ai=="🟢" else -1 if ai=="🔴" else 0)
     s-=warns
     tier="🟢 第一梯队" if s>=5 else ("🟢 较好" if s>=3 else "🟡 观察")

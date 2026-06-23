@@ -3,7 +3,8 @@
 #   数值：缩量/相对量 ← TradingView 扫描列(m，与选股同源)；逐K(波动收窄/higher lows/收盘强度/派发日) ← Yahoo 日线。
 #   AI 看图：把已生成的日K PNG 喂 Gemini API（需 GEMINI_API_KEY 或 ~/.deepvue/secrets.json；VISION=0 关）。HEALTH=0 整体关。
 # 形态评分是辅助、非定论——关键仓位仍要自己看图。
-import os, json, base64, time, urllib.request, urllib.error
+import os, json, base64, time, threading, urllib.request, urllib.error
+from concurrent.futures import ThreadPoolExecutor
 from qmag_core import OUTDIR, meta, HOME
 
 HEALTH_ON = os.environ.get("HEALTH","1")!="0"
@@ -71,7 +72,8 @@ def numeric_health(m, rows):
     if f.get("higher_lows") is True: s+=1
     elif f.get("higher_lows") is False: s-=1
     f["score"]=s
-    f["verdict"]="🟢吸筹收紧" if s>=2 else ("🔴派发疑虑" if s<=-2 else "🟡中性")
+    f["emoji"]="🟢" if s>=2 else ("🔴" if s<=-2 else "🟡")          # 显式字段，调用方不必再从中文 verdict 抠 emoji
+    f["verdict"]=f["emoji"]+("吸筹收紧" if s>=2 else ("派发疑虑" if s<=-2 else "中性"))
     return f
 
 # ---------- AI 看图复核（Anthropic 视觉；需 key）----------
@@ -80,9 +82,10 @@ _VIS_PROMPT=("这是一只美股日K图（约8个月）。看**最近1–2个月
   "B=放量派发/破位：高位反复放量、长上影、收盘被压回、低点走弱或跌破均线；\n"
   "C=普通/不够紧/仍在宽幅调整（多数属此）。\n"
   "只回 JSON：{\"verdict\":\"A|B|C\",\"reason\":\"≤15字中文具体依据\",\"confidence\":0-1}")
-_last=[0.0]
+_last=[0.0]; _rate_lock=threading.Lock()                  # 全局起跑节流闸（并发 vision 调用共用）
+_vision_dead=[False]                                       # key 失效/无效(400/401/403)后置位 → 本次运行余下直接跳过，不再白打
 def vision_health(png_path):
-    if not (VISION_ON and API_KEY and png_path):
+    if not (VISION_ON and API_KEY and png_path) or _vision_dead[0]:
         return None
     p=png_path if os.path.isabs(png_path) else os.path.join(OUTDIR, png_path)
     if not os.path.exists(p): return None
@@ -93,25 +96,33 @@ def vision_health(png_path):
     url=f"https://generativelanguage.googleapis.com/v1beta/models/{H['vision_model']}:generateContent?key={API_KEY}"
     data=json.dumps({"contents":[{"parts":[{"inline_data":{"mime_type":"image/png","data":b64}},
         {"text":_VIS_PROMPT}]}],"generationConfig":{"temperature":0,"maxOutputTokens":int(H.get("vision_max_tokens",1024))}}).encode()
-    interval=float(os.environ.get("VISION_INTERVAL", H.get("vision_interval_s",2)))
+    interval=float(os.environ.get("VISION_INTERVAL", H.get("vision_interval_s",0.4)))
     err=None
     for attempt in range(4):                                   # 节流 + 重试（429/503/空响应是 free-tier 常态）
-        gap=time.time()-_last[0]
-        if gap<interval: time.sleep(interval-gap)
+        with _rate_lock:                                       # 锁内只排开"起跑"间隔；请求本身在锁外并发跑
+            gap=time.time()-_last[0]
+            if gap<interval: time.sleep(interval-gap)
+            _last[0]=time.time()
         try:
             req=urllib.request.Request(url, data=data, headers={"content-type":"application/json"})
-            r=json.load(urllib.request.urlopen(req, timeout=90)); _last[0]=time.time()
+            r=json.load(urllib.request.urlopen(req, timeout=90))
             c=r.get("candidates",[{}])[0]
             txt="".join(p.get("text","") for p in c.get("content",{}).get("parts",[]) if "text" in p)
-            js=json.loads(txt[txt.find("{"):txt.rfind("}")+1])
+            i,j=txt.find("{"),txt.rfind("}")
+            if i<0 or j<=i:                                    # 空/截断响应（含 MAX_TOKENS）→ 不强行解析；重试或记错误
+                err=f"empty/truncated(finish={c.get('finishReason')})"
+                if attempt<3: time.sleep(1.5*(attempt+1)); continue
+                break
+            js=json.loads(txt[i:j+1])
             emoji={"A":"🟢","B":"🔴","C":"🟡"}.get(str(js.get("verdict","C")).strip()[:1].upper(),"🟡")
             return {"emoji":emoji,"reason":str(js.get("reason",""))[:20],"confidence":js.get("confidence")}
         except urllib.error.HTTPError as e:
-            _last[0]=time.time(); err=f"HTTP {e.code}"
+            err=f"HTTP {e.code}"
+            if e.code in (400,401,403): _vision_dead[0]=True; break   # key 过期/无效 → 不重试、置全局死标
             if e.code in (429,500,503) and attempt<3: time.sleep(2*(attempt+1)); continue
             break
         except Exception as e:
-            _last[0]=time.time(); err=repr(e)[:50]
+            err=repr(e)[:50]
             if attempt<3: time.sleep(1.5*(attempt+1)); continue
             break
     return {"error":err}
@@ -130,21 +141,33 @@ def health_for(items, cm, date, log=lambda s: None):
     todo=[m for m in items if m["ticker"] not in cache]
     if todo:
         log(f"  形态评分 {len(todo)} 只（复用 {len(items)-len(todo)}）" + ("" if (VISION_ON and API_KEY) else "（无 AI 看图：未设 GEMINI key 或 VISION=0）") + "…")
-    out={}
+    out={m["ticker"]:cache[m["ticker"]] for m in items if m["ticker"] in cache}
+    lock=threading.Lock()
     def _save():
         try: json.dump(cache, open(cache_path,"w",encoding="utf-8"), ensure_ascii=False)
         except Exception: pass
-    for m in items:
+    def work(m):                                          # 每只：数值(快) + 看图(慢网络) → 并发
         t=m["ticker"]
-        if t in cache: out[t]=cache[t]; continue
         h=numeric_health(m, daily_bars(t))
         vis=vision_health(cm.get(t))
         if vis and "error" not in vis: h["vision"]=vis
         elif vis and "error" in vis: h["vision_err"]=vis["error"]
-        out[t]=cache[t]=h; _save()                       # 增量落盘：pro 慢，超时/中断也能续跑
-        log(f"  🩺 {t} {h['verdict']}" + (f" 👁{h['vision']['emoji']}" if h.get("vision") else ""))
+        return t,h
+    workers=max(1,int(os.environ.get("VISION_WORKERS","6")))
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        for t,h in ex.map(work, todo):
+            out[t]=h
+            with lock:                                    # 串行化缓存写入；vision 瞬时失败不落盘 → 下次重试
+                if "vision_err" not in h: cache[t]=h; _save()
+            log(f"  🩺 {t} {h['verdict']}" + (f" 👁{h['vision']['emoji']}" if h.get("vision") else ""))
+    if _vision_dead[0]: log("  ⚠️ Gemini key 已过期/无效 → 本次仅数值形态。去 aistudio.google.com 续期后写入 secrets.json。")
     return out
 
+def health_emoji(h):                                  # 数值形态 emoji；兼容旧缓存（无 emoji 字段则从 verdict 推）
+    if not h: return "🟡"
+    if h.get("emoji"): return h["emoji"]
+    v=h.get("verdict","")
+    return "🟢" if "吸筹" in v else ("🔴" if "派发" in v else "🟡")
 def _pc(x): return f"{x*100:+.0f}%" if isinstance(x,(int,float)) else "–"
 def health_line(h):
     if not h: return None

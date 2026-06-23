@@ -5,26 +5,23 @@
 import datetime, statistics, os
 from qmag_core import *
 from charts import ensure_charts
-from health import health_for, health_line
+from health import health_for, health_line, health_emoji
 
 N=int(os.environ.get("TOPN","25"))
-enabled={k:v for k,v in cfg["themes"].items() if v.get("enabled")}
-theme_tickers={k:list(dict.fromkeys(v["tickers"])) for k,v in enabled.items()}
-idx_themes={}
-for k,ts in theme_tickers.items():
-    for t in ts: idx_themes.setdefault(t,[]).append(k)
-theme_set=set(idx_themes)
+enabled,theme_tickers,idx_themes,theme_set=load_themes()
 
 M=fetch(None)                                              # 一次全市场，三视图共用
-flags={t:(is_breakout(m),is_ep(m)) for t,m in M.items()}
+if len(M)<500: print(f"⚠️ 仅取到 {len(M)} 只（全市场通常上万）——数据可能不全，报告慎用。")
+flags={t:(is_breakout(m),is_ep(m)) for t,m in M.items()}   # 每只只判一次，全程复用
 unresolved={k:[t for t in ts if t not in M] for k,ts in theme_tickers.items()}
 unresolved={k:v for k,v in unresolved.items() if v}
 
-ready_all=[m for m in M.values() if is_ready(m) and (m.get("type") in ("stock","dr") or m.get("type") is None)]
+ready_all=[m for m in M.values() if is_ready(m) and is_equity(m)]
 ready_all.sort(key=ready_key, reverse=True)
+ready_set={m["ticker"] for m in ready_all}                 # ⭐ 标记用，免得每行再 is_ready
 mkt_ready=ready_all[:10]; theme_ready=[m for m in ready_all if m["ticker"] in theme_set][:10]
-nbk_all=sum(1 for m in M.values() if is_breakout(m))
-whole=[m for m in M.values() if is_breakout(m) and (m.get("type") in ("stock","dr") or m.get("type") is None)]
+nbk_all=sum(1 for t in flags if flags[t][0])               # 复用 flags，不重算 is_breakout
+whole=[m for t,m in M.items() if flags[t][0] and is_equity(m)]
 whole.sort(key=lambda m:(m["p6"] if m["p6"] is not None else -9), reverse=True); whole=whole[:N]
 theme_hits=[t for t in theme_set if t in M and (flags[t][0] or flags[t][1])]
 
@@ -49,6 +46,7 @@ reg=regime_lines()
 md=[f"# 每日盯盘 · {date_str}"]
 md.append(f"\n> 运行：{run_ts} ｜ 后端：**{BACKEND}** ｜ 全市场 {len(M)} ｜ 主题命中 {len(theme_hits)} ｜ 可买 {len(ready_all)} ｜ Breakout {nbk_all}")
 md+=reg
+if len(M)<500: md.append(f"> ⚠️ **数据异常**：仅取到 {len(M)} 只（全市场通常上万），结果可能不全。")
 
 # —— 目录 ——
 md.append("\n## 目录")
@@ -68,7 +66,7 @@ for name in enabled:
     md.append("\n| | Tkr | Last | ADR | 6M | 3M | 1M | 离高 | St2 | Gap | RV | $Vol |")
     md.append("|--|--|--:|--:|--:|--:|--:|--:|:--:|--:|--:|--:|")
     for m in rows:
-        fb,fe=flags[m["ticker"]]; mk=("✓" if fb else "")+("⚡" if fe else "")+("⭐" if is_ready(m) else "")
+        fb,fe=flags[m["ticker"]]; mk=("✓" if fb else "")+("⚡" if fe else "")+("⭐" if m["ticker"] in ready_set else "")
         md.append(f"| {mk} | **{m['ticker']}** | {fp(m['last'])} | {fadr(m['adr'])} | {pct(m['p6'])} | {pct(m['p3'])} | {pct(m['p1'])} | {pct(m['off_high'])} | {st2(m)} | {pct1(m['gap'])} | {frv(m['relvol'])} | {fvol(m['dollar_vol'])} |")
     hits=[m for m in rows if flags[m["ticker"]][0] or flags[m["ticker"]][1]]
     if hits:
@@ -91,7 +89,7 @@ def ready_block(title, rows):
         md.append(f"| {i} | **{m['ticker']}** | {pct(m['p6'])} | {pct(m['p3'])} | {pct(m['p1'])} | {pct(m['off_high'])} | {fadr(m['adr'])} | {fvol(m['dollar_vol'])} | {m['sector']}{thm} |")
     md.append("")
     for m in rows:
-        md.append(analysis(m, idx_themes.get(m["ticker"],[]), True, is_ep(m))); md.extend(emb(m["ticker"]))
+        md.append(analysis(m, idx_themes.get(m["ticker"],[]), True, flags[m["ticker"]][1])); md.extend(emb(m["ticker"]))
 ready_block("全市场可买", mkt_ready)
 ready_block("主题内可买", theme_ready)
 
@@ -107,7 +105,7 @@ for i,m in enumerate(whole,1):
     t=m["ticker"]; rel=cm.get(t)
     md.append(f"\n**{i}. {t}**　{pct(m['p6'])} 6M · ADR {fadr(m['adr'])} · 离高 {pct(m['off_high'])}")
     md.append(f"![{t} 日K]({rel})" if rel else "_(图未生成)_")
-    nt=stage_note(m, True, is_ep(m))
+    nt=stage_note(m, *flags[t])
     if nt: md.append("- **阶段与注意**：" + "；".join(nt) + "。")
     hl=health_line(hm.get(t))
     if hl: md.append(hl.lstrip())
@@ -119,22 +117,21 @@ if unresolved:
 # —— ⚡ 可快速入手·精选（放文末作"今日结论"；阶段+形态+警示 打分，🟢第一梯队置顶）——
 # 注：精选取自可买清单（is_ready），阶段必为"候选·等ORH"无区分度 → 该列改用「就绪度」(ready_key)。
 picks=list({m["ticker"]:m for m in (mkt_ready+theme_ready)}.values())
-picks=sorted(picks, key=lambda m: quick_pick(m, True, is_ep(m), hm.get(m["ticker"]))[0], reverse=True)
+picks=sorted(picks, key=lambda m: quick_pick(m, True, flags[m["ticker"]][1], hm.get(m["ticker"]))[0], reverse=True)
 if picks:
     md.append("\n---\n## ⚡ 可快速入手 · 精选（今日结论）")
     md.append("> 全部为「候选·等ORH」形态。评分 = 阶段(候选+3) ＋ 数值形态(吸筹+2/派发−2) ＋ AI看图(🟢+1/🔴−1) − ⚠️数 → **🟢第一梯队=挂 ORH 突破单首选**；🟡观察=形态未净再等。**就绪度** = 离高 − |近月| + ADR×权重，越高越贴高越紧、越快突破。仍须看图终判，非投资建议。")
     md.append("\n| 梯队 | Tkr | 6M | 1M | 离高 | ADR | 就绪度 | 形态 | 👁AI | ⚠️ | $Vol | 板块 |")
     md.append("|--|--|--:|--:|--:|--:|--:|:--:|:--:|:--:|--:|--|")
     for m in picks:
-        s,stage,tier=quick_pick(m, True, is_ep(m), hm.get(m["ticker"]))
-        h=hm.get(m["ticker"],{}) or {}; num=h.get("verdict","")
-        ne="🟢" if "吸筹" in num else ("🔴" if "派发" in num else "🟡")
-        ai=(h.get("vision") or {}).get("emoji","—") or "—"
-        warns="；".join(stage_note(m, True, is_ep(m))).count("⚠️")
-        plate="/".join(idx_themes[m["ticker"]]) if m["ticker"] in theme_set else m["sector"]
-        md.append(f"| {tier} | **{m['ticker']}** | {pct(m['p6'])} | {pct(m['p1'])} | {pct(m['off_high'])} | {fadr(m['adr'])} | {ready_key(m)*100:+.0f} | {ne} | {ai} | {warns} | {fvol(m['dollar_vol'])} | {plate} |")
+        t=m["ticker"]; fe=flags[t][1]; h=hm.get(t,{}) or {}
+        tier=quick_pick(m, True, fe, h)[2]
+        ne=health_emoji(h); ai=(h.get("vision") or {}).get("emoji","—") or "—"
+        warns="；".join(stage_note(m, True, fe)).count("⚠️")
+        plate="/".join(idx_themes[t]) if t in theme_set else m["sector"]
+        md.append(f"| {tier} | **{t}** | {pct(m['p6'])} | {pct(m['p1'])} | {pct(m['off_high'])} | {fadr(m['adr'])} | {fmt_ready(m)} | {ne} | {ai} | {warns} | {fvol(m['dollar_vol'])} | {plate} |")
 
-md.append(f"\n---\n*后端={BACKEND}；图=TradingView widget 截图；形态=TV量能+Yahoo逐K+可选AI看图（延迟/EOD）。✓/⚡/⭐与形态均为数值/AI辅助，非投资建议。*")
+md.append(f"\n---\n*后端={BACKEND}；图=真·TradingView登录截图（或 mplfinance 自绘）；形态=TV量能+Yahoo逐K+可选AI看图（延迟/EOD）。✓/⚡/⭐与形态均为数值/AI辅助，非投资建议。*")
 
 os.makedirs(OUTDIR, exist_ok=True); out_path=os.path.join(OUTDIR, f"{date_str}.md")
 with open(out_path,"w",encoding="utf-8") as f: f.write("\n".join(md))

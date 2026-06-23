@@ -9,7 +9,7 @@ from charts import ensure_charts
 N=int(os.environ.get("TOPN","25"))
 M=fetch(None)                                   # None = whole US universe
 # whole-market Breakout = individual equities only (exclude leveraged ETFs/ETNs like SOXL/KORU)
-cands=[m for m in M.values() if is_breakout(m) and (m.get("type") in ("stock","dr") or m.get("type") is None)]
+cands=[m for m in M.values() if is_breakout(m) and is_equity(m)]
 cands.sort(key=lambda m:(m["p6"] if m["p6"] is not None else -9), reverse=True)
 top=cands[:N]
 

@@ -47,14 +47,16 @@ def _tv_charts(todo, date, log):
                 pg.wait_for_timeout(WAIT_MS if i==0 else WAIT_NEXT)
                 try: pg.keyboard.press("Escape")
                 except Exception: pass
-                if i==0 and pg.query_selector("button:has-text('Sign in')"):
+                if pg.query_selector("button:has-text('Sign in')"):   # 每只都查：cookies 中途失效也侦测到
                     log("  ⚠️ TradingView 未登录（cookies 失效？）→ 整体回退 mplfinance")
                     b.close(); return None
                 el=pg.query_selector(".chart-container") or pg.query_selector(".chart-gui-wrapper")
-                if el:
-                    el.screenshot(path=_png_path(t,date)); out[t]=chart_relpath(t,date); log(f"  📈 {t}")
-                else:
-                    out[t]=None; log(f"  ⚠️ {t} 未找到图表元素")
+                if not el:
+                    out[t]=None; log(f"  ⚠️ {t} 未找到图表元素"); continue
+                p=_png_path(t,date); el.screenshot(path=p)
+                if os.path.getsize(p)<5000:                            # 异常小=空白/未渲染 → 弃，不内嵌坏图
+                    os.remove(p); out[t]=None; log(f"  ⚠️ {t} 截图疑似空白，跳过"); continue
+                out[t]=chart_relpath(t,date); log(f"  📈 {t}")
             except Exception as e:
                 out[t]=None; log(f"  ⚠️ {t} 截图失败：{repr(e)[:50]}")
         b.close()
@@ -114,9 +116,10 @@ def ensure_charts(symbols_by_ticker, date, log=lambda s: None):
         log("  (CHARTS=0，跳过配图)"); return {t:None for t in symbols_by_ticker}
     if not symbols_by_ticker: return {}
     os.makedirs(os.path.join(OUTDIR, DIRNAME, date), exist_ok=True)
+    force=os.environ.get("FORCE_CHARTS","0")!="0"          # 忽略既有 PNG，强制重截（修坏图用）
     out, todo = {}, []
     for t,sym in symbols_by_ticker.items():
-        if os.path.exists(_png_path(t,date)): out[t]=chart_relpath(t,date)
+        if not force and os.path.exists(_png_path(t,date)): out[t]=chart_relpath(t,date)
         else: todo.append((t,sym))
     if not todo: return out
     if MODE!="mpl" and os.path.exists(TV_COOKIES):

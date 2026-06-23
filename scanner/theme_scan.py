@@ -6,17 +6,13 @@ import datetime, statistics, os, sys
 from qmag_core import *
 from charts import ensure_charts
 
-enabled={k:v for k,v in cfg["themes"].items() if v.get("enabled")}
-theme_tickers={k:list(dict.fromkeys(v["tickers"])) for k,v in enabled.items()}
+enabled,theme_tickers,idx_themes,theme_set=load_themes()
 all_tickers={t for ts in theme_tickers.values() for t in ts}
 if not all_tickers: sys.exit("没有启用的主题/标的。")
 M=fetch(all_tickers)
 unresolved={k:[t for t in ts if t not in M] for k,ts in theme_tickers.items()}
 unresolved={k:v for k,v in unresolved.items() if v}
 flags={t:(is_breakout(m),is_ep(m)) for t,m in M.items()}
-idx_themes={}
-for k,ts in theme_tickers.items():
-    for t in ts: idx_themes.setdefault(t,[]).append(k)
 
 # 逐只详细分析 analysis(m, themes, fb, fe) 已移到 qmag_core.py（与 ready_top10.py 共用一份）
 

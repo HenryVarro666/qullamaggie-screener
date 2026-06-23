@@ -7,14 +7,10 @@ from qmag_core import *
 from charts import ensure_charts
 
 N=int(os.environ.get("TOPN","10"))
-enabled={k:v for k,v in cfg["themes"].items() if v.get("enabled")}
-idx_themes={}
-for k,v in enabled.items():
-    for t in dict.fromkeys(v["tickers"]): idx_themes.setdefault(t,[]).append(k)
-theme_set=set(idx_themes)
+enabled,_,idx_themes,theme_set=load_themes()
 
 M=fetch(None)                                           # 全市场抓一次；主题是其子集，按 ticker 过滤即可，不二次抓
-ready_hits=[m for m in M.values() if is_ready(m) and (m.get("type") in ("stock","dr") or m.get("type") is None)]
+ready_hits=[m for m in M.values() if is_ready(m) and is_equity(m)]
 ready_hits.sort(key=ready_key, reverse=True)            # 就绪度高 → 排前（剔除杠杆 ETF，同 breakout_top10）
 mkt_top=ready_hits[:N]
 theme_top=[m for m in ready_hits if m["ticker"] in theme_set][:N]
@@ -24,13 +20,12 @@ date_str=datetime.datetime.now().strftime("%Y-%m-%d"); run_ts=datetime.datetime.
 chart_rows={m["ticker"]:m for m in (mkt_top+theme_top)}                     # 全市场+主题并集，去重
 print("配图（TradingView 日K截图）…")
 cm=ensure_charts({t:tv_symbol(m) for t,m in chart_rows.items()}, date_str, print)
-def rscore(m): return f"{(m['off_high']-abs(m['p1'])+m['adr']*ready['adr_weight'])*100:+.0f}"   # 就绪度（越高越好）
 def table(rows):
     out=["| # | Tkr | 6M | 3M | 1M | 离高 | ADR | $Vol | 就绪度 | Sector |",
          "|--:|--|--:|--:|--:|--:|--:|--:|--:|--|"]
     for i,m in enumerate(rows,1):
         thm=("｜"+"/".join(idx_themes[m["ticker"]])) if m["ticker"] in theme_set else ""
-        out.append(f"| {i} | **{m['ticker']}** | {pct(m['p6'])} | {pct(m['p3'])} | {pct(m['p1'])} | {pct(m['off_high'])} | {fadr(m['adr'])} | {fvol(m['dollar_vol'])} | {rscore(m)} | {m['sector']}{thm} |")
+        out.append(f"| {i} | **{m['ticker']}** | {pct(m['p6'])} | {pct(m['p3'])} | {pct(m['p1'])} | {pct(m['off_high'])} | {fadr(m['adr'])} | {fvol(m['dollar_vol'])} | {fmt_ready(m)} | {m['sector']}{thm} |")
     return "\n".join(out)
 def detail(rows):
     blocks=[]
